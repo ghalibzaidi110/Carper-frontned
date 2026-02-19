@@ -1,3 +1,5 @@
+"use client";
+
 import React, { createContext, useContext, useState, useCallback } from "react";
 import { User } from "@/types";
 import { DUMMY_USERS } from "@/data/dummy";
@@ -20,6 +22,7 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(() => {
+    if (typeof window === "undefined") return null;
     const saved = localStorage.getItem("auth_user");
     return saved ? JSON.parse(saved) : null;
   });
@@ -28,7 +31,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const found = DUMMY_USERS.find((u) => u.email === email);
     if (found) {
       setUser(found);
-      localStorage.setItem("auth_user", JSON.stringify(found));
+      if (typeof window !== "undefined") {
+        localStorage.setItem("auth_user", JSON.stringify(found));
+      }
       return true;
     }
     return false;
@@ -36,7 +41,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(() => {
     setUser(null);
-    localStorage.removeItem("auth_user");
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("auth_user");
+    }
   }, []);
 
   return (

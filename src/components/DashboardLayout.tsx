@@ -1,10 +1,13 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useNavigate, useLocation, Link } from "react-router-dom";
-import { 
-  LayoutDashboard, Car, Image, ScanSearch, ShoppingCart, Users, Shield, 
+import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
+import {
+  LayoutDashboard, Car, ScanSearch, ShoppingCart, Users, Shield,
   BarChart3, Bell, UserCircle, LogOut, Menu, X, Truck, Package
 } from "lucide-react";
-import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface NavItem {
@@ -31,20 +34,23 @@ const NAV_ITEMS: NavItem[] = [
 
 const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const router = useRouter();
+  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  if (!user) {
-    navigate("/auth/login");
-    return null;
-  }
+  useEffect(() => {
+    if (!user) {
+      router.push("/auth/login");
+    }
+  }, [user, router]);
+
+  if (!user) return null;
 
   const filteredNav = NAV_ITEMS.filter((item) => item.roles.includes(user.role));
 
   const handleLogout = () => {
     logout();
-    navigate("/");
+    router.push("/");
   };
 
   return (
@@ -65,11 +71,11 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           {filteredNav.map((item) => {
-            const isActive = location.pathname === item.path;
+            const isActive = pathname === item.path;
             return (
               <Link
                 key={item.path}
-                to={item.path}
+                href={item.path}
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
@@ -112,7 +118,6 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Topbar */}
         <header className="h-16 border-b border-border bg-card flex items-center justify-between px-4 lg:px-6">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -122,7 +127,7 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
           </button>
           <div className="hidden lg:block">
             <h2 className="font-display text-lg font-semibold text-foreground">
-              {filteredNav.find((n) => n.path === location.pathname)?.label || "Dashboard"}
+              {filteredNav.find((n) => n.path === pathname)?.label || "Dashboard"}
             </h2>
           </div>
           <div className="flex items-center gap-3">

@@ -1,0 +1,12 @@
+{
+  "/page": "app/page.js",
+  "/auth/login/page": "app/auth/login/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/auth/register/page": "app/auth/register/page.js",
+  "/dashboard/cars/page": "app/dashboard/cars/page.js",
+  "/dashboard/detection/page": "app/dashboard/detection/page.js",
+  "/dashboard/listings/page": "app/dashboard/listings/page.js",
+  "/marketplace/page": "app/marketplace/page.js",
+  "/dashboard/notifications/page": "app/dashboard/notifications/page.js",
+  "/dashboard/profile/page": "app/dashboard/profile/page.js"
+}
