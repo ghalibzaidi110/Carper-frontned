@@ -9,6 +9,7 @@ import {
   BarChart3, Bell, UserCircle, LogOut, Menu, X, Truck, Package
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useUnreadCount } from "@/hooks/use-api";
 
 interface NavItem {
   label: string;
@@ -33,23 +34,25 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { data: unreadData } = useUnreadCount();
+  const unreadCount = unreadData?.unreadCount ?? 0;
 
   useEffect(() => {
-    if (!user) {
+    if (!loading && !user) {
       router.push("/auth/login");
     }
-  }, [user, router]);
+  }, [user, loading, router]);
 
-  if (!user) return null;
+  if (loading || !user) return null;
 
   const filteredNav = NAV_ITEMS.filter((item) => item.roles.includes(user.role));
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     router.push("/");
   };
 
@@ -131,10 +134,14 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
             </h2>
           </div>
           <div className="flex items-center gap-3">
-            <button className="relative p-2 rounded-lg hover:bg-muted transition-colors">
+            <Link href="/dashboard/notifications" className="relative p-2 rounded-lg hover:bg-muted transition-colors">
               <Bell size={20} className="text-muted-foreground" />
-              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-primary animate-pulse-glow" />
-            </button>
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 h-5 w-5 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
+                  {unreadCount > 9 ? "9+" : unreadCount}
+                </span>
+              )}
+            </Link>
             <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
               {user.name.charAt(0)}
             </div>

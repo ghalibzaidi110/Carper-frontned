@@ -4,24 +4,34 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { Car, Eye, EyeOff } from "lucide-react";
+import { Car, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (login(email, password)) {
-      const user = JSON.parse(localStorage.getItem("auth_user") || "{}");
-      router.push(user.role === "ADMIN" ? "/admin/users" : "/dashboard");
-    } else {
-      setError("Invalid credentials. Try john@example.com, rental@example.com, or admin@example.com");
+    setLoading(true);
+    try {
+      const success = await login(email, password);
+      if (success) {
+        const saved = localStorage.getItem("auth_user");
+        const user = saved ? JSON.parse(saved) : null;
+        router.push(user?.role === "ADMIN" ? "/admin/users" : "/dashboard");
+      } else {
+        setError("Invalid credentials. Please check your email and password.");
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -54,7 +64,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                placeholder="john@example.com"
+                placeholder="your@email.com"
               />
             </div>
             <div>
@@ -66,7 +76,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring pr-10"
-                  placeholder="password123"
+                  placeholder="Enter your password"
                 />
                 <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -75,25 +85,17 @@ export default function LoginPage() {
             </div>
             <button
               type="submit"
-              className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors"
+              disabled={loading}
+              className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
             >
-              Sign In
+              {loading && <Loader2 size={16} className="animate-spin" />}
+              {loading ? "Signing In..." : "Sign In"}
             </button>
           </form>
 
           <div className="mt-4 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
             <Link href="/auth/register" className="text-primary font-medium hover:underline">Register</Link>
-          </div>
-        </div>
-
-        <div className="mt-6 p-4 rounded-xl bg-muted border border-border">
-          <p className="text-xs font-semibold text-foreground mb-2">Demo Accounts:</p>
-          <div className="space-y-1 text-xs text-muted-foreground">
-            <p>Individual: <span className="text-foreground font-mono">john@example.com</span></p>
-            <p>Car Rental: <span className="text-foreground font-mono">rental@example.com</span></p>
-            <p>Admin: <span className="text-foreground font-mono">admin@example.com</span></p>
-            <p className="text-muted-foreground/60 mt-1">Password: any (dummy auth)</p>
           </div>
         </div>
       </div>

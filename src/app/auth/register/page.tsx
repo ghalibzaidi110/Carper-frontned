@@ -4,23 +4,54 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { Car } from "lucide-react";
+import { Car, Loader2 } from "lucide-react";
 
 export default function RegisterPage() {
   const [accountType, setAccountType] = useState<"INDIVIDUAL" | "CAR_RENTAL">("INDIVIDUAL");
-  const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "", phone: "", city: "", businessName: "", businessLicense: "" });
+  const [form, setForm] = useState({
+    fullName: "", email: "", password: "", confirmPassword: "",
+    phoneNumber: "", city: "", businessName: "", businessLicense: "",
+  });
   const [error, setError] = useState("");
-  const { login } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const { register } = useAuth();
   const router = useRouter();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+
     if (form.password !== form.confirmPassword) {
       setError("Passwords don't match");
       return;
     }
-    if (login("john@example.com", "")) {
-      router.push("/dashboard");
+    if (form.password.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const success = await register({
+        email: form.email,
+        password: form.password,
+        fullName: form.fullName,
+        accountType,
+        phoneNumber: form.phoneNumber || undefined,
+        city: form.city || undefined,
+        businessName: accountType === "CAR_RENTAL" ? form.businessName : undefined,
+        businessLicense: accountType === "CAR_RENTAL" ? form.businessLicense : undefined,
+      });
+
+      if (success) {
+        router.push("/dashboard");
+      } else {
+        setError("Registration failed. Email may already be in use.");
+      }
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -69,7 +100,7 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Full Name *</label>
-                <input type="text" required value={form.name} onChange={(e) => updateForm("name", e.target.value)}
+                <input type="text" required value={form.fullName} onChange={(e) => updateForm("fullName", e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
               </div>
               <div>
@@ -95,7 +126,7 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-foreground mb-1.5">Phone</label>
-                <input type="tel" value={form.phone} onChange={(e) => updateForm("phone", e.target.value)}
+                <input type="tel" value={form.phoneNumber} onChange={(e) => updateForm("phoneNumber", e.target.value)}
                   className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
               </div>
               <div>
@@ -120,8 +151,13 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <button type="submit" className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors">
-              Create Account
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading && <Loader2 size={16} className="animate-spin" />}
+              {loading ? "Creating Account..." : "Create Account"}
             </button>
           </form>
 
