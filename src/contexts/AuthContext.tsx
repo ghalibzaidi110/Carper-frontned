@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { User } from "@/types";
-import { authService, RegisterPayload } from "@/services/auth.service";
+import { authService, RegisterPayload, GoogleCompleteSignupPayload } from "@/services/auth.service";
 import { getAccessToken, clearTokens } from "@/lib/api-client";
 import { normalizeUser } from "@/lib/normalize";
 
@@ -11,6 +11,7 @@ interface AuthContextType {
   loading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   register: (payload: RegisterPayload) => Promise<boolean>;
+  completeGoogleSignup: (payload: GoogleCompleteSignupPayload) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
@@ -21,6 +22,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   login: async () => false,
   register: async () => false,
+  completeGoogleSignup: async () => false,
   logout: async () => {},
   refreshUser: async () => {},
   isAuthenticated: false,
@@ -74,8 +76,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const normalized = normalizeUser(result.user);
       persistUser(normalized);
       return true;
-    } catch {
-      return false;
+    } catch (error: any) {
+      // Re-throw error with message so the component can display it
+      throw error;
     }
   }, []);
 
@@ -85,8 +88,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const normalized = normalizeUser(result.user);
       persistUser(normalized);
       return true;
-    } catch {
-      return false;
+    } catch (error: any) {
+      // Re-throw error with message so the component can display it
+      throw error;
+    }
+  }, []);
+
+  const completeGoogleSignup = useCallback(async (payload: GoogleCompleteSignupPayload) => {
+    try {
+      const result = await authService.completeGoogleSignup(payload);
+      const normalized = normalizeUser(result.user);
+      persistUser(normalized);
+      return true;
+    } catch (error: any) {
+      // Re-throw error with message so the component can display it
+      throw error;
     }
   }, []);
 
@@ -100,7 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser, isAuthenticated: !!user }}>
+    <AuthContext.Provider value={{ user, loading, login, register, completeGoogleSignup, logout, refreshUser, isAuthenticated: !!user }}>
       {children}
     </AuthContext.Provider>
   );

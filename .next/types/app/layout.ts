@@ -1,4 +1,4 @@
-// File: C:\Users\S JUNAID\Desktop\ride-health-report-main\Carper-frontned\src\app\layout.tsx
+// File: C:\Users\BYTES PAK\Desktop\project\car\Carper-frontned\src\app\layout.tsx
 import * as entry from '../../../src/app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
