@@ -767,6 +767,9 @@ h1, h2, h3, h4, h5, h6 {
 .top-full{
   top: 100%;
 }
+.bottom-2{
+  bottom: 0.5rem;
+}
 .z-10{
   z-index: 10;
 }
@@ -845,6 +848,9 @@ h1, h2, h3, h4, h5, h6 {
 .ml-1{
   margin-left: 0.25rem;
 }
+.ml-2{
+  margin-left: 0.5rem;
+}
 .ml-auto{
   margin-left: auto;
 }
@@ -880,9 +886,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 .mt-auto{
   margin-top: auto;
-}
-.ml-2{
-  margin-left: 0.5rem;
 }
 .block{
   display: block;
@@ -1123,6 +1126,9 @@ h1, h2, h3, h4, h5, h6 {
 .max-w-4xl{
   max-width: 56rem;
 }
+.max-w-6xl{
+  max-width: 72rem;
+}
 .max-w-\[--skeleton-width\]{
   max-width: var(--skeleton-width);
 }
@@ -1144,9 +1150,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 .max-w-xl{
   max-width: 36rem;
-}
-.max-w-6xl{
-  max-width: 72rem;
 }
 .flex-1{
   flex: 1 1 0%;
@@ -1285,6 +1288,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 .grid-cols-2{
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.grid-cols-1{
+  grid-template-columns: repeat(1, minmax(0, 1fr));
 }
 .flex-row{
   flex-direction: row;
@@ -1467,6 +1473,9 @@ h1, h2, h3, h4, h5, h6 {
 .border-b{
   border-bottom-width: 1px;
 }
+.border-b-2{
+  border-bottom-width: 2px;
+}
 .border-l{
   border-left-width: 1px;
 }
@@ -1475,9 +1484,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 .border-t{
   border-top-width: 1px;
-}
-.border-b-2{
-  border-bottom-width: 2px;
 }
 .border-dashed{
   border-style: dashed;
@@ -1614,6 +1620,9 @@ h1, h2, h3, h4, h5, h6 {
 .bg-sidebar-border{
   background-color: hsl(var(--sidebar-border));
 }
+.bg-success{
+  background-color: hsl(var(--success));
+}
 .bg-success\/10{
   background-color: hsl(var(--success) / 0.1);
 }
@@ -1629,8 +1638,14 @@ h1, h2, h3, h4, h5, h6 {
 .bg-warning\/5{
   background-color: hsl(var(--warning) / 0.05);
 }
-.bg-success{
-  background-color: hsl(var(--success));
+.bg-amber-500\/20{
+  background-color: rgb(245 158 11 / 0.2);
+}
+.bg-destructive\/90{
+  background-color: hsl(var(--destructive) / 0.9);
+}
+.bg-success\/90{
+  background-color: hsl(var(--success) / 0.9);
 }
 .fill-current{
   fill: currentColor;
@@ -1665,6 +1680,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 .p-\[1px\]{
   padding: 1px;
+}
+.p-0\.5{
+  padding: 0.125rem;
 }
 .px-1{
   padding-left: 0.25rem;
@@ -1791,6 +1809,9 @@ h1, h2, h3, h4, h5, h6 {
 .pr-2\.5{
   padding-right: 0.625rem;
 }
+.pr-3{
+  padding-right: 0.75rem;
+}
 .pr-4{
   padding-right: 1rem;
 }
@@ -1812,8 +1833,8 @@ h1, h2, h3, h4, h5, h6 {
 .pt-4{
   padding-top: 1rem;
 }
-.pr-3{
-  padding-right: 0.75rem;
+.pt-6{
+  padding-top: 1.5rem;
 }
 .text-left{
   text-align: left;
@@ -1978,6 +1999,9 @@ h1, h2, h3, h4, h5, h6 {
 .text-success{
   color: hsl(var(--success));
 }
+.text-success-foreground{
+  color: hsl(var(--success-foreground));
+}
 .text-warning{
   color: hsl(var(--warning));
 }
@@ -1985,8 +2009,12 @@ h1, h2, h3, h4, h5, h6 {
   --tw-text-opacity: 1;
   color: rgb(255 255 255 / var(--tw-text-opacity, 1));
 }
-.text-success-foreground{
-  color: hsl(var(--success-foreground));
+.text-amber-700{
+  --tw-text-opacity: 1;
+  color: rgb(180 83 9 / var(--tw-text-opacity, 1));
+}
+.text-foreground\/90{
+  color: hsl(var(--foreground) / 0.9);
 }
 .underline-offset-4{
   text-underline-offset: 4px;
@@ -2390,12 +2418,16 @@ h1, h2, h3, h4, h5, h6 {
   background-color: hsl(var(--success) / 0.2);
 }
 
+.hover\:bg-success\/90:hover{
+  background-color: hsl(var(--success) / 0.9);
+}
+
 .hover\:bg-warning\/20:hover{
   background-color: hsl(var(--warning) / 0.2);
 }
 
-.hover\:bg-success\/90:hover{
-  background-color: hsl(var(--success) / 0.9);
+.hover\:bg-muted-foreground\/20:hover{
+  background-color: hsl(var(--muted-foreground) / 0.2);
 }
 
 .hover\:text-accent-foreground:hover{
@@ -3275,6 +3307,11 @@ h1, h2, h3, h4, h5, h6 {
   border-color: hsl(var(--destructive));
 }
 
+.dark\:text-amber-400:is(.dark *){
+  --tw-text-opacity: 1;
+  color: rgb(251 191 36 / var(--tw-text-opacity, 1));
+}
+
 @media (min-width: 640px){
 
   .sm\:bottom-0{
@@ -3299,6 +3336,10 @@ h1, h2, h3, h4, h5, h6 {
 
   .sm\:max-w-sm{
     max-width: 24rem;
+  }
+
+  .sm\:grid-cols-2{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .sm\:flex-row{

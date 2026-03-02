@@ -348,6 +348,20 @@ export const useDetectImage = () => {
   });
 };
 
+export const useDamageScan = () =>
+  useMutation({
+    mutationFn: (files: File | File[]) => damageDetectionService.scanImages(files),
+    onSuccess: (data) => {
+      const { summary } = data;
+      if (summary.isDemoMode) {
+        toast.success(`Scan complete (demo mode). ${summary.imagesWithDamage} of ${summary.totalImages} image(s) processed.`);
+      } else {
+        toast.success(`Scan complete. ${summary.imagesWithDamage} of ${summary.totalImages} image(s) had damage.`);
+      }
+    },
+    onError: () => toast.error("Scan failed. Check file format (JPG, PNG, WEBP) and size (max 10MB)."),
+  });
+
 // ─── Notifications ───────────────────────────────────────────
 
 export const useNotifications = (params: NotificationFilters = {}) =>
