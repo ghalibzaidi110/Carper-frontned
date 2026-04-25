@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import { useUserCars, useDamageHistory, useDetectCar, useDetectImage, useDamageScan } from "@/hooks/use-api";
 import { reportsService } from "@/services/reports.service";
 import { useAuth } from "@/contexts/AuthContext";
 import type { DamageScanResponse } from "@/services/damage-detection.service";
-import { ScanSearch, Download, AlertTriangle, CheckCircle, Loader2, Upload, X } from "lucide-react";
+import { ScanSearch, Download, AlertTriangle, CheckCircle, Loader2, Upload, X, Plus, ImageIcon } from "lucide-react";
 
 const MAX_FILES = 10;
 const MAX_SIZE_MB = 10;
@@ -88,11 +88,10 @@ export default function DamageDetectionPage() {
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">Damage Detection</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              {selectedCar
-                ? `${(selectedCar.manufacturer || (selectedCar.catalogCar as Record<string, unknown>)?.manufacturer) as string} ${(selectedCar.model || (selectedCar.catalogCar as Record<string, unknown>)?.modelName) as string} (${selectedCar.registrationNumber as string})`
-                : "Select a car"}
+              Upload car image(s) below to scan for damage.
             </p>
           </div>
+          {/* TEMP: hidden — registered-car flow not in use yet
           <div className="flex gap-3">
             <button
               onClick={handleRunDetection}
@@ -111,6 +110,7 @@ export default function DamageDetectionPage() {
               Download PDF
             </button>
           </div>
+          */}
         </div>
 
         {/* Quick Scan: upload images (no car required) */}
@@ -176,48 +176,152 @@ export default function DamageDetectionPage() {
             </div>
           )}
           {scanResult && (
-            <div className="mt-6 pt-6 border-t border-border">
-              <div className="flex items-center gap-2 mb-4">
-                <h4 className="font-semibold text-foreground">Scan results</h4>
+            <div className="mt-6 pt-6 border-t border-border space-y-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <h4 className="font-semibold text-foreground text-base">Scan Report</h4>
                 {scanResult.summary.isDemoMode && (
                   <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-700 dark:text-amber-400 text-xs font-medium">
-                    Demo mode
+                    Demo mode (Python service unavailable)
                   </span>
                 )}
                 <span className="text-sm text-muted-foreground">
-                  {scanResult.summary.imagesWithDamage} of {scanResult.summary.totalImages} with damage
+                  {scanResult.summary.imagesWithDamage} of {scanResult.summary.totalImages} image(s) flagged with damage
                 </span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {scanResult.results.map((r, i) => (
-                  <div key={i} className="rounded-xl border border-border overflow-hidden bg-muted/30">
-                    <div className="aspect-video relative">
-                      <img
-                        src={r.processedImageUrl}
-                        alt={`Result ${i + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-                      <div className="absolute bottom-2 left-2 right-2 flex items-center justify-between">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${r.hasDamage ? "bg-destructive/90 text-destructive-foreground" : "bg-success/90 text-success-foreground"}`}>
-                          {r.hasDamage ? "Damage" : "Clean"}
-                        </span>
-                        {r.confidence > 0 && (
-                          <span className="text-xs text-foreground/90 bg-black/50 px-2 py-0.5 rounded">
-                            {(r.confidence * 100).toFixed(0)}%
-                          </span>
+
+              {scanResult.results.map((r, i) => {
+                const sev = (r.severity || "NONE").toUpperCase();
+                const sevClass: Record<string, string> = {
+                  NONE: "bg-success/15 text-success border-success/30",
+                  MINOR: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
+                  MODERATE: "bg-orange-500/15 text-orange-600 dark:text-orange-400 border-orange-500/30",
+                  SEVERE: "bg-destructive/15 text-destructive border-destructive/30",
+                };
+                const confPct = Math.round((r.confidence ?? 0) * 100);
+                const dets = r.detections ?? [];
+                return (
+                  <div key={i} className="rounded-xl border border-border bg-card overflow-hidden">
+                    {/* Header: status + severity + confidence */}
+                    <div className="px-4 py-3 border-b border-border flex flex-wrap items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        {r.hasDamage ? (
+                          <AlertTriangle size={18} className="text-destructive" />
+                        ) : (
+                          <CheckCircle size={18} className="text-success" />
                         )}
+                        <span className="font-semibold text-foreground">
+                          Image {i + 1}: {r.hasDamage ? "Damage Detected" : "No Damage"}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-md border text-xs font-medium ${sevClass[sev] ?? sevClass.NONE}`}>
+                          {sev}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Confidence</span>
+                        <div className="w-32 h-2 rounded-full bg-muted overflow-hidden">
+                          <div
+                            className={`h-full ${r.hasDamage ? "bg-destructive" : "bg-success"}`}
+                            style={{ width: `${confPct}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-foreground tabular-nums w-10 text-right">{confPct}%</span>
+                        <a
+                          href={r.processedImageUrl}
+                          download={`scan-${i + 1}.jpg`}
+                          className="ml-2 inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border border-border hover:bg-muted transition-colors"
+                          title="Download annotated image"
+                        >
+                          <Download size={12} />
+                          Save
+                        </a>
                       </div>
                     </div>
-                    <div className="p-3 text-xs text-muted-foreground">
-                      Severity: {r.severity || "NONE"}
-                      {r.detections?.length > 0 && ` · ${r.detections.length} detection(s)`}
+
+                    {/* Body: original vs annotated */}
+                    <div className="grid grid-cols-1 md:grid-cols-2">
+                      <div className="relative">
+                        <span className="absolute top-2 left-2 z-10 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-black/60 text-white">
+                          Original
+                        </span>
+                        <img
+                          src={r.originalImageUrl}
+                          alt={`Original ${i + 1}`}
+                          className="w-full h-72 md:h-80 object-contain bg-muted/40"
+                        />
+                      </div>
+                      <div className="relative border-l border-border">
+                        <span className="absolute top-2 left-2 z-10 text-[10px] uppercase tracking-wider px-2 py-0.5 rounded bg-black/60 text-white">
+                          Annotated
+                        </span>
+                        <img
+                          src={r.processedImageUrl}
+                          alt={`Annotated ${i + 1}`}
+                          className="w-full h-72 md:h-80 object-contain bg-muted/40"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Detections table */}
+                    <div className="px-4 py-3 border-t border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <h5 className="text-sm font-semibold text-foreground">
+                          Detections ({dets.length})
+                        </h5>
+                      </div>
+                      {dets.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">
+                          No damage regions detected by the model.
+                        </p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-left text-muted-foreground border-b border-border">
+                                <th className="py-2 pr-4 font-medium">#</th>
+                                <th className="py-2 pr-4 font-medium">Label</th>
+                                <th className="py-2 pr-4 font-medium">Confidence</th>
+                                <th className="py-2 pr-4 font-medium">BBox (x1, y1, x2, y2)</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dets.map((d, j) => {
+                                const dConf = Math.round(((d.confidence ?? 0) as number) * 100);
+                                const bbox = (d.bbox ?? []) as number[];
+                                return (
+                                  <tr key={j} className="border-b border-border/50 last:border-0">
+                                    <td className="py-2 pr-4 text-muted-foreground tabular-nums">{j + 1}</td>
+                                    <td className="py-2 pr-4 font-medium text-foreground">{d.label || "—"}</td>
+                                    <td className="py-2 pr-4 tabular-nums">
+                                      <div className="flex items-center gap-2">
+                                        <div className="w-20 h-1.5 rounded-full bg-muted overflow-hidden">
+                                          <div className="h-full bg-primary" style={{ width: `${dConf}%` }} />
+                                        </div>
+                                        <span>{dConf}%</span>
+                                      </div>
+                                    </td>
+                                    <td className="py-2 pr-4 font-mono text-xs text-muted-foreground tabular-nums">
+                                      {bbox.length === 4
+                                        ? `[${bbox.map((n) => n.toFixed(0)).join(", ")}]`
+                                        : "—"}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
           )}
         </div>
+
+        {/* TEMP: hidden — registered-car flow not in use yet.
+            Uncomment this block (and the Run Detection / Download PDF buttons above)
+            to bring back: vehicle selector, per-position results grid, and detection history.
 
         <div className="bg-card rounded-xl border border-border shadow-card p-4">
           <label className="block text-sm font-medium text-foreground mb-2">Select Vehicle</label>
@@ -288,6 +392,7 @@ export default function DamageDetectionPage() {
             )}
           </div>
         </div>
+        */}
       </div>
     </DashboardLayout>
   );
