@@ -82,14 +82,14 @@ export function CameraViewport({
       {/* Video + overlay */}
       <div className="relative bg-black aspect-video">
         <video
-          ref={videoRef}
+          ref={videoRef as React.RefObject<HTMLVideoElement>}
           autoPlay
           playsInline
           muted
           className="absolute inset-0 w-full h-full object-contain"
         />
         <canvas
-          ref={canvasRef}
+          ref={canvasRef as React.RefObject<HTMLCanvasElement>}
           className="absolute inset-0 w-full h-full object-contain pointer-events-none"
         />
         {!isActive && (

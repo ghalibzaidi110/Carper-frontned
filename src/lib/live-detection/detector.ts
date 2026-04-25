@@ -5,8 +5,8 @@ import type { Bbox } from "./iou";
 import { iou } from "./iou";
 import type { Detection } from "./tracks";
 
-// Match the version installed locally (see package.json)
-ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/";
+// Match the version installed locally (see package.json -> onnxruntime-web)
+ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/";
 ort.env.wasm.numThreads = 1;
 
 const MODEL_URL = "/models/damage.onnx";
