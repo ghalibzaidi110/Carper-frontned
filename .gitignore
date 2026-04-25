@@ -19,7 +19,8 @@ next-env.d.ts
 tsconfig.tsbuildinfo
 
 # Live-detection ML models (large binaries, copied locally from new-webxr)
-public/models/*.onnx
+# Committed so Vercel deploys serve them as static assets
+# public/models/*.onnx
 
 # Environment
 .env
