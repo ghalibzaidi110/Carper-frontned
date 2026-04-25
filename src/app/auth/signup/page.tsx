@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Car, Loader2 } from "lucide-react";
 
-export default function GoogleSignupPage() {
+function GoogleSignupContent() {
   const [accountType, setAccountType] = useState<"INDIVIDUAL" | "CAR_RENTAL">("INDIVIDUAL");
   const [form, setForm] = useState({
     phoneNumber: "", city: "", address: "", country: "Pakistan",
@@ -244,3 +244,10 @@ export default function GoogleSignupPage() {
   );
 }
 
+export default function GoogleSignupPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+      <GoogleSignupContent />
+    </Suspense>
+  );
+}

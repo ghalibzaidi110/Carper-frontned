@@ -384,7 +384,7 @@ export default function CarDetailPage() {
                         <div>
                           <h3 className="font-semibold text-foreground">
                             Version {version.version as number}
-                            {version.isCurrent && (
+                            {Boolean(version.isCurrent) && (
                               <span className="ml-2 px-2 py-0.5 rounded bg-primary/10 text-primary text-xs font-medium">
                                 Current
                               </span>

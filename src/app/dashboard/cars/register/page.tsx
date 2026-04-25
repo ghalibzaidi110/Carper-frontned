@@ -526,7 +526,7 @@ export default function RegisterCarPage() {
         {step === 3 && (
           <div className="bg-card rounded-xl border border-border shadow-card p-6 space-y-6">
             <h2 className="text-xl font-display font-semibold text-foreground">Upload Registration Images</h2>
-            <p className="text-sm text-muted-foreground">Upload 4 images of your car from different angles. These images are permanent and will serve as your car's baseline record.</p>
+            <p className="text-sm text-muted-foreground">Upload 4 images of your car from different angles. These images are permanent and will serve as your car&apos;s baseline record.</p>
 
             <div className="grid md:grid-cols-2 gap-4">
               {(["front", "back", "left", "right"] as const).map((position) => (

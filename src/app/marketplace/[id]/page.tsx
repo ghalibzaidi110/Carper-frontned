@@ -7,10 +7,10 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useListingById, useContactSeller } from "@/hooks/use-api";
 import { formatPKR, formatDate } from "@/lib/format";
 import StatusBadge from "@/components/StatusBadge";
-import { 
-  ArrowLeft, Car, MapPin, Eye, Calendar, CheckCircle, AlertTriangle, 
+import {
+  ArrowLeft, Car, MapPin, Eye, Calendar, CheckCircle, AlertTriangle,
   Mail, User, Phone, MessageSquare, Loader2, ChevronLeft, ChevronRight,
-  Shield
+  Shield, X
 } from "lucide-react";
 import { toast } from "sonner";
 
