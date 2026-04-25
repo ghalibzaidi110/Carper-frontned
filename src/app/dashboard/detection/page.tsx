@@ -19,7 +19,17 @@ export default function DamageDetectionPage() {
   const [selectedCarId, setSelectedCarId] = useState<string>("");
   const [quickScanFiles, setQuickScanFiles] = useState<File[]>([]);
   const [scanResult, setScanResult] = useState<DamageScanResponse | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Object URLs for thumbnails — recompute when files change, revoke on cleanup
+  const previews = useMemo(
+    () => quickScanFiles.map((f) => URL.createObjectURL(f)),
+    [quickScanFiles],
+  );
+  useEffect(() => {
+    return () => previews.forEach((url) => URL.revokeObjectURL(url));
+  }, [previews]);
 
   const carId = selectedCarId || (userCars[0]?.id as string) || "";
   const selectedCar = userCars.find((c: Record<string, unknown>) => c.id === carId);
@@ -29,20 +39,40 @@ export default function DamageDetectionPage() {
   const detectImage = useDetectImage();
   const damageScan = useDamageScan();
 
-  const handleQuickScanFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const chosen = Array.from(e.target.files || []);
-    const valid: File[] = [];
-    for (const file of chosen) {
-      if (!ALLOWED_TYPES.includes(file.type)) continue;
-      if (file.size > MAX_SIZE_MB * 1024 * 1024) continue;
-      valid.push(file);
-    }
+  const acceptFiles = (chosen: File[]) => {
+    const valid = chosen.filter(
+      (f) => ALLOWED_TYPES.includes(f.type) && f.size <= MAX_SIZE_MB * 1024 * 1024,
+    );
     setQuickScanFiles((prev) => [...prev, ...valid].slice(0, MAX_FILES));
+  };
+
+  const handleQuickScanFiles = (e: React.ChangeEvent<HTMLInputElement>) => {
+    acceptFiles(Array.from(e.target.files || []));
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (!isDragging) setIsDragging(true);
+  };
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    acceptFiles(Array.from(e.dataTransfer.files));
   };
 
   const removeQuickScanFile = (index: number) => {
     setQuickScanFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const formatBytes = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
   const runQuickScan = () => {
@@ -115,10 +145,23 @@ export default function DamageDetectionPage() {
 
         {/* Quick Scan: upload images (no car required) */}
         <div className="bg-card rounded-xl border border-border shadow-card p-6">
-          <h3 className="font-display font-semibold text-foreground mb-1">Quick Scan</h3>
-          <p className="text-sm text-muted-foreground mb-4">
-            Upload 1–10 images (JPG, PNG, WEBP, max 10MB each) to run damage detection without linking to a car.
-          </p>
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h3 className="font-display font-semibold text-foreground text-lg flex items-center gap-2">
+                <ImageIcon size={18} className="text-primary" />
+                Quick Scan
+              </h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Upload up to {MAX_FILES} images and let our AI inspect them for damage.
+              </p>
+            </div>
+            {quickScanFiles.length > 0 && (
+              <span className="px-2.5 py-1 rounded-full bg-primary/10 text-primary text-xs font-medium tabular-nums">
+                {quickScanFiles.length} / {MAX_FILES}
+              </span>
+            )}
+          </div>
+
           <input
             ref={fileInputRef}
             type="file"
@@ -127,53 +170,138 @@ export default function DamageDetectionPage() {
             onChange={handleQuickScanFiles}
             className="hidden"
           />
-          <div className="flex flex-wrap items-center gap-3 mb-4">
-            <button
-              type="button"
+
+          {quickScanFiles.length === 0 ? (
+            // Empty state — large dropzone
+            <div
               onClick={() => fileInputRef.current?.click()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm font-medium hover:bg-muted transition-colors"
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  fileInputRef.current?.click();
+                }
+              }}
+              className={`group cursor-pointer rounded-xl border-2 border-dashed py-14 px-6 text-center transition-all ${
+                isDragging
+                  ? "border-primary bg-primary/5 scale-[1.01]"
+                  : "border-border hover:border-primary/50 hover:bg-muted/30"
+              }`}
             >
-              <Upload size={16} />
-              Choose images
-            </button>
-            {quickScanFiles.length > 0 && (
-              <>
-                <span className="text-sm text-muted-foreground">
-                  {quickScanFiles.length} file(s) selected
-                </span>
-                <button
-                  type="button"
-                  onClick={runQuickScan}
-                  disabled={damageScan.isPending}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
-                >
-                  {damageScan.isPending ? <Loader2 size={16} className="animate-spin" /> : <ScanSearch size={16} />}
-                  {damageScan.isPending ? "Scanning..." : "Run scan"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setQuickScanFiles([]); setScanResult(null); }}
-                  className="text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Clear
-                </button>
-              </>
-            )}
-          </div>
-          {quickScanFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {quickScanFiles.map((f, i) => (
-                <span
-                  key={i}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-muted text-xs text-foreground"
-                >
-                  {f.name}
-                  <button type="button" onClick={() => removeQuickScanFile(i)} className="p-0.5 hover:bg-muted-foreground/20 rounded">
-                    <X size={12} />
-                  </button>
-                </span>
-              ))}
+              <div className={`mx-auto w-14 h-14 rounded-full flex items-center justify-center mb-4 transition-colors ${
+                isDragging ? "bg-primary/15" : "bg-primary/10 group-hover:bg-primary/15"
+              }`}>
+                <Upload size={26} className="text-primary" />
+              </div>
+              <p className="font-medium text-foreground">
+                {isDragging ? (
+                  "Drop your images to upload"
+                ) : (
+                  <>Drop images here, or <span className="text-primary underline-offset-2 group-hover:underline">click to browse</span></>
+                )}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                JPG, PNG, or WEBP &middot; up to {MAX_SIZE_MB} MB each &middot; max {MAX_FILES} images
+              </p>
             </div>
+          ) : (
+            <>
+              {/* Thumbnail grid + drop target for adding more */}
+              <div
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 p-3 rounded-xl border-2 border-dashed transition-colors ${
+                  isDragging ? "border-primary bg-primary/5" : "border-border/70"
+                }`}
+              >
+                {quickScanFiles.map((f, i) => (
+                  <div
+                    key={`${f.name}-${i}`}
+                    className="relative group rounded-lg overflow-hidden border border-border bg-muted/30 aspect-square shadow-sm"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={previews[i]}
+                      alt={f.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeQuickScanFile(i)}
+                      aria-label={`Remove ${f.name}`}
+                      className="absolute top-1.5 right-1.5 p-1 rounded-full bg-black/70 text-white opacity-0 group-hover:opacity-100 hover:bg-destructive transition-opacity"
+                    >
+                      <X size={12} />
+                    </button>
+                    <div className="absolute inset-x-0 bottom-0 px-2 py-1.5 bg-gradient-to-t from-black/80 via-black/40 to-transparent">
+                      <p className="text-[11px] text-white font-medium truncate" title={f.name}>
+                        {f.name}
+                      </p>
+                      <p className="text-[10px] text-white/70 tabular-nums">{formatBytes(f.size)}</p>
+                    </div>
+                  </div>
+                ))}
+
+                {quickScanFiles.length < MAX_FILES && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="aspect-square rounded-lg border-2 border-dashed border-border hover:border-primary/50 hover:bg-muted/30 flex flex-col items-center justify-center gap-1.5 transition-colors group"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+                      <Plus size={18} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                    <span className="text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">
+                      Add more
+                    </span>
+                  </button>
+                )}
+              </div>
+
+              {/* Action bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 mt-5">
+                <span className="text-sm text-muted-foreground">
+                  {quickScanFiles.length} {quickScanFiles.length === 1 ? "image" : "images"} ready &middot;{" "}
+                  <span className="tabular-nums">
+                    {formatBytes(quickScanFiles.reduce((s, f) => s + f.size, 0))}
+                  </span>{" "}
+                  total
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setQuickScanFiles([]); setScanResult(null); }}
+                    disabled={damageScan.isPending}
+                    className="text-sm px-4 py-2 rounded-lg border border-border text-foreground hover:bg-muted disabled:opacity-50 transition-colors"
+                  >
+                    Clear
+                  </button>
+                  <button
+                    type="button"
+                    onClick={runQuickScan}
+                    disabled={damageScan.isPending}
+                    className="flex items-center gap-2 px-5 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold shadow-sm hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {damageScan.isPending ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Scanning…
+                      </>
+                    ) : (
+                      <>
+                        <ScanSearch size={16} />
+                        Run scan
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </>
           )}
           {scanResult && (
             <div className="mt-6 pt-6 border-t border-border space-y-6">
