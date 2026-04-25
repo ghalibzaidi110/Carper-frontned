@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, Car, ScanSearch, ShoppingCart, Users, Shield,
-  BarChart3, Bell, UserCircle, LogOut, Menu, X, Truck, Package
+  BarChart3, Bell, UserCircle, LogOut, Menu, X, Truck, Package, Camera
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUnreadCount } from "@/hooks/use-api";
@@ -22,6 +22,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL", "ADMIN"] },
   { label: "My Cars", path: "/dashboard/cars", icon: <Car size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL"] },
   { label: "Damage Detection", path: "/dashboard/detection", icon: <ScanSearch size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL"] },
+  { label: "Live Detection", path: "/dashboard/live-detection", icon: <Camera size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL"] },
   { label: "My Listings", path: "/dashboard/listings", icon: <ShoppingCart size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL"] },
   { label: "Rentals", path: "/dashboard/rentals", icon: <Truck size={20} />, roles: ["CAR_RENTAL"] },
   { label: "Marketplace", path: "/marketplace", icon: <Package size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL"] },

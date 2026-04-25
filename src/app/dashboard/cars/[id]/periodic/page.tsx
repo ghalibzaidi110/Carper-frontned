@@ -145,7 +145,7 @@ export default function UploadPeriodicImagesPage() {
         <div className="bg-card rounded-xl border border-border shadow-card p-6 space-y-6">
           <h2 className="text-xl font-display font-semibold text-foreground">
             Upload 4 Periodic Inspection Images
-          </p>
+          </h2>
           <p className="text-sm text-muted-foreground">
             Upload images from the same angles as your registration images: front, back, left, and right.
           </p>
