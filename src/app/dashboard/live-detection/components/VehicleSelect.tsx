@@ -1,0 +1,107 @@
+"use client";
+
+import { Car } from "lucide-react";
+import { useMemo } from "react";
+
+import {
+  type Vehicle,
+  type VehicleMake,
+  VEHICLE_DATA,
+  clampYear,
+  getModelsForMake,
+} from "@/lib/live-detection/vehicle";
+
+interface VehicleSelectProps {
+  value: Vehicle;
+  onChange: (vehicle: Vehicle) => void;
+}
+
+const MAKES = Object.keys(VEHICLE_DATA) as VehicleMake[];
+
+export function VehicleSelect({ value, onChange }: VehicleSelectProps) {
+  const models = useMemo(() => getModelsForMake(value.make), [value.make]);
+  const currentModel = useMemo(
+    () => models.find((m) => m.model === value.model) ?? models[0],
+    [models, value.model],
+  );
+
+  return (
+    <div className="bg-card rounded-xl border border-border shadow-card p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <Car size={16} className="text-primary" />
+        <h3 className="text-sm font-semibold text-foreground">Vehicle</h3>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {/* Make */}
+        <div className="col-span-2">
+          <label className="block text-xs font-medium text-muted-foreground mb-1">Make</label>
+          <select
+            value={value.make}
+            onChange={(e) => {
+              const make = e.target.value as VehicleMake;
+              const newModels = getModelsForMake(make);
+              const newModel = newModels[0];
+              onChange({
+                make,
+                model: newModel?.model ?? value.model,
+                year: newModel ? clampYear(newModel, value.year) : value.year,
+              });
+            }}
+            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {MAKES.map((m) => (
+              <option key={m} value={m}>
+                {m}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Model */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">Model</label>
+          <select
+            value={value.model}
+            onChange={(e) => {
+              const model = e.target.value;
+              const entry = models.find((m) => m.model === model) ?? currentModel;
+              onChange({
+                ...value,
+                model,
+                year: entry ? clampYear(entry, value.year) : value.year,
+              });
+            }}
+            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            {models.map((m) => (
+              <option key={m.model} value={m.model}>
+                {m.model}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Year */}
+        <div>
+          <label className="block text-xs font-medium text-muted-foreground mb-1">Year</label>
+          <input
+            type="number"
+            value={value.year}
+            min={currentModel?.min ?? 2000}
+            max={currentModel?.max ?? 2024}
+            onChange={(e) =>
+              onChange({
+                ...value,
+                year: currentModel
+                  ? clampYear(currentModel, parseInt(e.target.value, 10) || value.year)
+                  : parseInt(e.target.value, 10) || value.year,
+              })
+            }
+            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring tabular-nums"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
