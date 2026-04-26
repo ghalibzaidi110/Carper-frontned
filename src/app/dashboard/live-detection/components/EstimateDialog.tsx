@@ -22,6 +22,32 @@ const DECISION_STYLE: Record<string, string> = {
   unknown: "bg-muted text-muted-foreground border-border",
 };
 
+/**
+ * Format the damage size for the UI, choosing the most honest unit
+ * for the measurement source we have available.
+ *
+ *  - panel_reference  → real cm² from panel-as-ruler scaling
+ *  - client_provided / fallback_estimate → percentage of frame
+ *    (showing fabricated cm² would imply precision we don't have)
+ */
+function formatDamageSize(
+  entry: LogEntry | null,
+  cm2: number,
+  scaleSource?: string,
+): string {
+  if (scaleSource === "panel_reference") {
+    return `${cm2.toFixed(0)} cm² (panel-anchored)`;
+  }
+  if (!entry) return "—";
+  const [, , w, h] = entry.bbox;
+  const bboxArea = (w ?? 0) * (h ?? 0);
+  const frameArea = entry.frameSize
+    ? entry.frameSize[0] * entry.frameSize[1]
+    : 1280 * 720;
+  const pct = bboxArea > 0 ? (bboxArea / frameArea) * 100 : 0;
+  return `~${pct.toFixed(1)}% of frame`;
+}
+
 export function EstimateDialog({ entry, onClose }: EstimateDialogProps) {
   const open = entry !== null && entry.estimate !== null;
   const est = entry?.estimate;
@@ -54,16 +80,18 @@ export function EstimateDialog({ entry, onClose }: EstimateDialogProps) {
 
             <div className="rounded-lg border border-border bg-muted/30 p-4 text-center">
               <p className="text-xs uppercase tracking-wider text-muted-foreground mb-1">
-                Estimated cost
+                Estimated cost range
               </p>
               <p className="text-3xl font-bold font-mono tabular-nums text-foreground">
-                {est.cost.toLocaleString()}{" "}
-                <span className="text-base font-normal text-muted-foreground">
+                {est.costLow.toLocaleString()}
+                <span className="mx-2 text-muted-foreground/70 text-2xl font-normal">–</span>
+                {est.costHigh.toLocaleString()}
+                <span className="ml-2 text-base font-normal text-muted-foreground">
                   {est.currency}
                 </span>
               </p>
               <p className="text-xs text-muted-foreground mt-1 tabular-nums">
-                Range: {est.costLow.toLocaleString()} – {est.costHigh.toLocaleString()} PKR
+                Approx. {est.cost.toLocaleString()} {est.currency} (median estimate)
               </p>
             </div>
 
@@ -71,10 +99,27 @@ export function EstimateDialog({ entry, onClose }: EstimateDialogProps) {
               {[
                 { k: "Method", v: est.breakdown.repairMethod.replace(/_/g, " ") },
                 { k: "Labor", v: `${est.breakdown.laborHours} h` },
-                { k: "Paint", v: `${est.breakdown.paintCost.toLocaleString()} PKR` },
+                {
+                  k: "Paint",
+                  v: `${est.breakdown.paintCost.toLocaleString()} ${est.currency}`,
+                },
                 { k: "Material", v: est.breakdown.material },
-                { k: "Area", v: `${est.breakdown.areaCm2} cm²` },
-                { k: "Perimeter", v: `${est.breakdown.perimeterCm} cm` },
+                {
+                  // When panel-as-ruler succeeds, show the real cm². When
+                  // it falls back to fixed-distance estimation, switch to a
+                  // percentage of frame so we don't imply precision we
+                  // don't have.
+                  k: "Damage size",
+                  v: formatDamageSize(
+                    entry,
+                    est.breakdown.areaCm2,
+                    est.breakdown.scaleSource,
+                  ),
+                },
+                {
+                  k: "Severity",
+                  v: <span className="capitalize">{est.breakdown.severityScore}</span>,
+                },
               ].map((row) => (
                 <div
                   key={row.k}
@@ -90,6 +135,15 @@ export function EstimateDialog({ entry, onClose }: EstimateDialogProps) {
               <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
                 Estimate widened due to unknown:{" "}
                 <span className="font-medium">{est.unknownFeatures.join(", ")}</span>
+              </p>
+            )}
+
+            {est.breakdown.scaleSource === "fallback_estimate" && (
+              <p className="text-xs text-muted-foreground bg-muted/40 border border-border rounded-md px-3 py-2">
+                <span className="font-medium text-foreground">Note:</span> the
+                damage size used for this estimate is approximate (the affected
+                panel wasn&apos;t fully visible to use as a real-world ruler).
+                Re-scan with the entire panel in frame for a more accurate cost.
               </p>
             )}
           </div>

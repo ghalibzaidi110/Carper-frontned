@@ -149,21 +149,36 @@ function getPartName(classId: number): string {
 }
 
 /**
+ * Result of identifying the panel at a given damage bbox.
+ *
+ * `panel` is the panel key (e.g. "hood") or "unknown" if nothing useful
+ * was detected. When successful, `panelBbox` and `frameSize` are filled
+ * in so callers can compute pixels-per-cm using the panel as a known
+ * reference.
+ */
+export interface PanelIdentification {
+  panel: string;
+  panelBbox?: Bbox;
+  frameSize?: [number, number]; // [width, height] of the source frame
+}
+
+/**
  * Identify the panel at the given damage bbox. Returns the panel key
- * (e.g. "hood") or "unknown" if nothing detected.
+ * (e.g. "hood") or "unknown" if nothing detected, plus the panel's
+ * bounding box for downstream scale calibration.
  */
 export async function identifyPanel(
   videoEl: HTMLVideoElement,
   damageBbox: Bbox,
-): Promise<string> {
+): Promise<PanelIdentification> {
   try {
     await ensureModel();
     ensureBuffers();
-    if (!partSession || !offCtx || !f32Buf) return "unknown";
+    if (!partSession || !offCtx || !f32Buf) return { panel: "unknown" };
 
     const vw = videoEl.videoWidth;
     const vh = videoEl.videoHeight;
-    if (!vw || !vh) return "unknown";
+    if (!vw || !vh) return { panel: "unknown" };
 
     const scale = Math.min(INPUT_SIZE / vw, INPUT_SIZE / vh);
     const nw = Math.round(vw * scale);
@@ -213,7 +228,7 @@ export async function identifyPanel(
 
     if (partDets.length === 0) {
       console.warn("[PartSeg] no part detections — returning unknown");
-      return "unknown";
+      return { panel: "unknown" };
     }
 
     let bestPart = partDets[0];
@@ -227,9 +242,13 @@ export async function identifyPanel(
       }
     }
 
-    return getPartName(bestPart.classId);
+    return {
+      panel: getPartName(bestPart.classId),
+      panelBbox: bestPart.bbox,
+      frameSize: [vw, vh],
+    };
   } catch (err) {
     console.error("[PartSeg] identifyPanel failed:", (err as Error).message);
-    return "unknown";
+    return { panel: "unknown" };
   }
 }

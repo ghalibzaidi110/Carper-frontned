@@ -49,6 +49,12 @@ export interface VendorSearchResponse {
 export interface CostEstimatePayload {
   className: string;
   panelLocation?: string;
+  /** Panel bbox in pixel coords [x, y, w, h] — used for panel-as-ruler scaling */
+  panelBbox?: number[];
+  /** [width, height] of the source frame in pixels */
+  frameSize?: [number, number];
+  /** Vehicle body category — sedan, hatchback, suv, pickup, minivan */
+  vehicleCategory?: "sedan" | "hatchback" | "suv" | "pickup" | "minivan";
   confidence: number;
   bbox: Bbox | number[];
   frameArea?: number;
@@ -76,6 +82,13 @@ export interface CostEstimateResponse {
     perimeterCm: number;
     material: string;
     severityScore: string;
+    /**
+     * How was the area calculated?
+     *  - "panel_reference"   real cm² via panel-as-ruler (most accurate)
+     *  - "client_provided"   client computed and sent
+     *  - "fallback_estimate" fixed-distance assumption (least accurate)
+     */
+    scaleSource?: "panel_reference" | "client_provided" | "fallback_estimate";
   };
 }
 

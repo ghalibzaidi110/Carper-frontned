@@ -68,6 +68,44 @@ export const DEFAULT_VEHICLE: Vehicle = {
   year: 2020,
 };
 
+/** Body style → drives the panel-dimensions lookup on the backend. */
+export type VehicleCategory = "sedan" | "hatchback" | "suv" | "pickup" | "minivan";
+
+/**
+ * Map (make, model) → body category. Must stay in sync with
+ * c_python/app/panel_dimensions.py:VEHICLE_CATEGORIES.
+ *
+ * Backend defaults to "sedan" when unrecognized, so this list is a
+ * convenience for the frontend (so we can show category badges, etc.)
+ * rather than a hard requirement.
+ */
+const VEHICLE_CATEGORY_MAP: Record<string, VehicleCategory> = {
+  "Toyota|Corolla":  "sedan",
+  "Toyota|Camry":    "sedan",
+  "Toyota|Fortuner": "suv",
+  "Toyota|Hilux":    "pickup",
+  "Honda|Civic":     "sedan",
+  "Honda|City":      "sedan",
+  "Honda|Accord":    "sedan",
+  "Honda|BR-V":      "suv",
+  "Suzuki|Alto":     "hatchback",
+  "Suzuki|Swift":    "hatchback",
+  "Suzuki|Cultus":   "hatchback",
+  "Hyundai|Elantra": "sedan",
+  "Hyundai|Sonata":  "sedan",
+  "Hyundai|Stonic":  "suv",
+  "Kia|Sportage":    "suv",
+  "Kia|Picanto":     "hatchback",
+  "Nissan|Sunny":    "sedan",
+  "Nissan|Dayz":     "hatchback",
+  "Daihatsu|Cuore":  "hatchback",
+  "Daihatsu|Mira":   "hatchback",
+};
+
+export function resolveCategory(vehicle: Vehicle): VehicleCategory {
+  return VEHICLE_CATEGORY_MAP[`${vehicle.make}|${vehicle.model}`] ?? "sedan";
+}
+
 export function getModelsForMake(make: VehicleMake): VehicleModelEntry[] {
   return VEHICLE_DATA[make] ?? [];
 }

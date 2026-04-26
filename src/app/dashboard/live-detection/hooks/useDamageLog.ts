@@ -12,7 +12,7 @@ import {
   liveDetectionService,
 } from "@/services/live-detection.service";
 
-import type { Vehicle } from "@/lib/live-detection/vehicle";
+import { resolveCategory, type Vehicle } from "@/lib/live-detection/vehicle";
 
 export const REPAIR_TYPES = new Set(["dent", "scratch", "crack"]);
 export const PARTS_TYPES = new Set(["glass_shatter", "tire_flat", "lamp_broken"]);
@@ -25,6 +25,10 @@ export interface LogEntry {
   bbox: Bbox;
   timestamp: string;
   panelLocation: string | null;
+  /** Panel bbox in video pixel coords; used for panel-as-ruler scaling */
+  panelBbox: Bbox | null;
+  /** Frame size at the moment the detection was logged: [width, height] */
+  frameSize: [number, number] | null;
   estimate: CostEstimateResponse | null;
   vendors: VendorSearchResponse | null;
   estimateLoading: boolean;
@@ -101,6 +105,8 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
         bbox: det.bbox,
         timestamp: new Date().toISOString(),
         panelLocation: null,
+        panelBbox: null,
+        frameSize: null,
         estimate: null,
         vendors: null,
         estimateLoading: false,
@@ -108,12 +114,22 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
       };
       setEntries((prev) => [...prev, entry]);
 
-      // Async: identify panel
+      // Async: identify panel (now also returns the panel bbox + frame
+      // dimensions so we can do panel-as-ruler scaling in the cost API)
       const video = videoRef.current;
       if (video) {
-        identifyPanel(video, det.bbox).then((panel) => {
+        identifyPanel(video, det.bbox).then((result) => {
           setEntries((prev) =>
-            prev.map((e) => (e.id === id ? { ...e, panelLocation: panel } : e)),
+            prev.map((e) =>
+              e.id === id
+                ? {
+                    ...e,
+                    panelLocation: result.panel,
+                    panelBbox: result.panelBbox ?? null,
+                    frameSize: result.frameSize ?? null,
+                  }
+                : e,
+            ),
           );
         });
 
@@ -190,6 +206,11 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
           const result = await liveDetectionService.estimateCost({
             className: entry.className,
             panelLocation: entry.panelLocation ?? undefined,
+            // Panel-as-ruler — backend will compute real cm² from these
+            // when available, falling back to legacy fixed-distance math.
+            panelBbox: entry.panelBbox ?? undefined,
+            frameSize: entry.frameSize ?? undefined,
+            vehicleCategory: resolveCategory(vehicle),
             confidence: entry.confidence,
             bbox: entry.bbox,
             frameArea,

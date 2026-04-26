@@ -1,5 +1,6 @@
 "use client";
 
+import { ShieldAlert } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 
 import DashboardLayout from "@/components/DashboardLayout";
@@ -18,6 +19,7 @@ import { useCamera } from "./hooks/useCamera";
 import { useDamageDetector } from "./hooks/useDamageDetector";
 import { type LogEntry, REPAIR_TYPES, useDamageLog } from "./hooks/useDamageLog";
 import { useDetectionLoop } from "./hooks/useDetectionLoop";
+import { useSecureContext } from "./hooks/useSecureContext";
 
 export default function LiveDetectionPage() {
   const [threshold, setThreshold] = useState(0.4);
@@ -29,6 +31,7 @@ export default function LiveDetectionPage() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  const secureContext = useSecureContext();
   const detector = useDamageDetector();
   const camera = useCamera();
   const { detections, fps } = useDetectionLoop({
@@ -72,6 +75,11 @@ export default function LiveDetectionPage() {
     }
   }, [log, vehicle]);
 
+  const handleStartCamera = useCallback(() => {
+    if (!secureContext.ok) return; // banner already explains why
+    void camera.start();
+  }, [secureContext.ok, camera]);
+
   const handleCapture = useCallback(() => {
     const video = camera.videoRef.current;
     const canvas = canvasRef.current;
@@ -108,6 +116,16 @@ export default function LiveDetectionPage() {
           </p>
         </div>
 
+        {!secureContext.ok && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 flex items-start gap-3">
+            <ShieldAlert size={20} className="text-amber-700 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <p className="font-semibold text-foreground">HTTPS required</p>
+              <p className="text-muted-foreground mt-1">{secureContext.reason}</p>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-4">
           <CameraViewport
             videoRef={camera.videoRef}
@@ -117,7 +135,7 @@ export default function LiveDetectionPage() {
             fps={fps}
             modelError={detector.error}
             cameraError={camera.error}
-            onStart={camera.start}
+            onStart={handleStartCamera}
             onStop={camera.stop}
             onCapture={handleCapture}
           />
