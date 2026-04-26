@@ -1,0 +1,46 @@
+{
+  "name": "parts-segmenter",
+  "version": "v1",
+  "format": "ONNX",
+  "architecture": "YOLOv8-seg with NMS baked in at export",
+  "inputSize": [640, 640],
+  "outputShape": "[1, 300, 38]  bbox(4)+conf(1)+cls(1)+mask_coefs(32)",
+  "classes": [
+    "back_bumper", "back_door", "back_glass", "back_left_door", "back_left_light",
+    "back_light", "back_right_door", "back_right_light", "front_bumper", "front_door",
+    "front_glass", "front_left_door", "front_left_light", "front_light", "front_right_door",
+    "front_right_light", "hood", "left_mirror", "object", "right_mirror",
+    "tailgate", "trunk", "wheel"
+  ],
+  "fileSize": 11099421,
+  "fileSizeHuman": "11.1 MB",
+  "trainedAt": "unknown — original from new-webxr",
+
+  "intendedUse": [
+    "Identify which car panel a damage region overlaps",
+    "Used after damage detection to label the damaged panel"
+  ],
+
+  "limitations": [
+    "Includes a generic 'object' class that often wins low-conf predictions",
+    "Mask prototypes are exported but not used (we only consume bboxes)",
+    "Confidence threshold of 0.10 in original code is permissive"
+  ],
+
+  "evaluation": {
+    "note": "Test metrics not available. See docs/live-detection-analysis/07-yolo-detection-deep-dive.md."
+  },
+
+  "knownIssues": [
+    "Conf threshold 0.10 too low — flagged as F-11 in audit",
+    "No damage-class consistency check (e.g., tire_flat being matched to a hood panel)"
+  ],
+
+  "history": [
+    {
+      "version": "v1",
+      "promotedAt": "2025-04-25",
+      "notes": "Initial deployment, copied from new-webxr/public/parts_best.onnx"
+    }
+  ]
+}

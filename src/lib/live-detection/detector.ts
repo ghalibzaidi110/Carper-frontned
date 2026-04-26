@@ -9,8 +9,14 @@ import type { Detection } from "./tracks";
 ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/";
 ort.env.wasm.numThreads = 1;
 
-const MODEL_URL = "/models/damage.onnx";
-const MODEL_CACHE = "carper-damage-model-v1";
+/**
+ * Damage-detection model version. Bumping this triggers a fresh download
+ * (Cache API key includes the version) and lets us roll back by pinning
+ * an older URL when needed.
+ */
+export const DAMAGE_MODEL_VERSION = "v1";
+const MODEL_URL = `/models/damage.${DAMAGE_MODEL_VERSION}.onnx`;
+const MODEL_CACHE = `carper-damage-model-${DAMAGE_MODEL_VERSION}`;
 const INPUT_SIZE = 640;
 const TOTAL_PX = INPUT_SIZE * INPUT_SIZE;
 

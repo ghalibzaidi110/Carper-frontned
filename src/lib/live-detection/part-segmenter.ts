@@ -14,8 +14,13 @@ import * as ort from "onnxruntime-web";
 import type { Bbox } from "./iou";
 import { panelOverlapScore } from "./iou";
 
-const MODEL_URL = "/models/parts.onnx";
-const MODEL_CACHE = "carper-parts-model-v1";
+/**
+ * Parts-segmentation model version. See detector.ts:DAMAGE_MODEL_VERSION
+ * for the rationale. Bumping invalidates the browser Cache API entry.
+ */
+export const PARTS_MODEL_VERSION = "v1";
+const MODEL_URL = `/models/parts.${PARTS_MODEL_VERSION}.onnx`;
+const MODEL_CACHE = `carper-parts-model-${PARTS_MODEL_VERSION}`;
 const INPUT_SIZE = 640;
 const CONF_THRESHOLD = 0.1;
 

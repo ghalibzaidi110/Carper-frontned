@@ -1,0 +1,51 @@
+{
+  "name": "damage-detector",
+  "version": "v1",
+  "format": "ONNX",
+  "architecture": "YOLOv8n",
+  "inputSize": [640, 640],
+  "outputShape": "[1, 4 + numClasses, num_boxes]  pre-NMS",
+  "classes": [
+    "dent",
+    "scratch",
+    "crack",
+    "glass_shatter",
+    "lamp_broken",
+    "tire_flat"
+  ],
+  "fileSize": 12269160,
+  "fileSizeHuman": "12.3 MB",
+  "trainedAt": "unknown — original from new-webxr",
+  "trainingDataset": "yolov8n_balanced (curated subset)",
+
+  "intendedUse": [
+    "Real-time damage detection on Pakistani-market vehicles",
+    "Daylight conditions, handheld phone capture at 30–200 cm",
+    "Both ONNX in-browser inference (Live Detection) and PyTorch server-side (Quick Scan)"
+  ],
+
+  "limitations": [
+    "Trained on Pakistan-market vehicles only — may underperform on others",
+    "Daylight conditions assumed",
+    "May misclassify low-light, heavily blurred, or aerial imagery",
+    "No continuous evaluation — drift not monitored"
+  ],
+
+  "evaluation": {
+    "note": "Test metrics not available. Models inherited from new-webxr without provenance. See docs/live-detection-analysis/07-yolo-detection-deep-dive.md for retraining plan."
+  },
+
+  "knownIssues": [
+    "Letterbox pad colour (#808080) may not match training pad (typically #727272)",
+    "Single global confidence threshold across all classes",
+    "NMS IoU threshold not tuned per class"
+  ],
+
+  "history": [
+    {
+      "version": "v1",
+      "promotedAt": "2025-04-25",
+      "notes": "Initial deployment, copied from new-webxr/public/best.onnx"
+    }
+  ]
+}

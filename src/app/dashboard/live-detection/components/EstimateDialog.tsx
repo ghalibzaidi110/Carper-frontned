@@ -146,6 +146,12 @@ export function EstimateDialog({ entry, onClose }: EstimateDialogProps) {
                 Re-scan with the entire panel in frame for a more accurate cost.
               </p>
             )}
+
+            {est.modelVersion && (
+              <p className="text-[10px] text-muted-foreground/70 text-right tabular-nums">
+                Estimate produced by cost model {est.modelVersion}
+              </p>
+            )}
           </div>
         )}
       </DialogContent>

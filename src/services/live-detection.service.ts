@@ -74,6 +74,8 @@ export interface CostEstimateResponse {
   severity: string;
   decision: "repair" | "replace" | "unknown";
   unknownFeatures: string[];
+  /** Identifies which trained model produced this prediction (e.g. "v1"). */
+  modelVersion?: string;
   breakdown: {
     repairMethod: string;
     laborHours: number;
