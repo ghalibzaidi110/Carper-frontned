@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { saveCapture } from "@/lib/live-detection/capture-store";
 import type { Bbox } from "@/lib/live-detection/iou";
@@ -82,6 +82,13 @@ async function captureRegion(
 
 export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn {
   const [entries, setEntries] = useState<LogEntry[]>([]);
+  // Mirror entries into a ref for synchronous reads in async handlers.
+  // setState updaters can be deferred / re-run under React 18 Strict Mode,
+  // so reading state via setEntries() is unreliable.
+  const entriesRef = useRef<LogEntry[]>([]);
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
 
   const add = useCallback(
     (det: Detection) => {
@@ -148,6 +155,28 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
       const pxPerCm = Math.sqrt(frameArea) / 60;
       const areaCm2 = +((bw / pxPerCm) * (bh / pxPerCm)).toFixed(2);
       const perimCm = +((bw + bh) * 2 / pxPerCm).toFixed(2);
+
+      // Repair-flow needs a known panel — mirrors webxr/estimate.js:61-68
+      if (REPAIR_TYPES.has(entry.className)) {
+        if (entry.panelLocation === null) {
+          const pending: LogEntry = {
+            ...entry,
+            estimateLoading: false,
+            estimateError: "Panel location still loading — try again in a moment.",
+          };
+          setEntries((prev) => prev.map((e) => (e.id === entry.id ? pending : e)));
+          return pending;
+        }
+        if (entry.panelLocation === "unknown") {
+          const noPanel: LogEntry = {
+            ...entry,
+            estimateLoading: false,
+            estimateError: "Panel could not be identified — re-scan with the part in frame.",
+          };
+          setEntries((prev) => prev.map((e) => (e.id === entry.id ? noPanel : e)));
+          return noPanel;
+        }
+      }
 
       // Mark loading
       setEntries((prev) =>
@@ -225,12 +254,7 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
 
   const runEstimate = useCallback(
     async (id: number, vehicle: Vehicle): Promise<LogEntry | null> => {
-      // Read current entry from state
-      let entry: LogEntry | undefined;
-      setEntries((prev) => {
-        entry = prev.find((e) => e.id === id);
-        return prev;
-      });
+      const entry = entriesRef.current.find((e) => e.id === id);
       if (!entry) return null;
       return runEstimateInner(entry, vehicle);
     },
@@ -239,11 +263,7 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
 
   const runEstimateAll = useCallback(
     async (vehicle: Vehicle): Promise<LogEntry[]> => {
-      let snapshot: LogEntry[] = [];
-      setEntries((prev) => {
-        snapshot = prev;
-        return prev;
-      });
+      const snapshot = entriesRef.current.slice();
       const results = await Promise.all(snapshot.map((e) => runEstimateInner(e, vehicle)));
       return results;
     },

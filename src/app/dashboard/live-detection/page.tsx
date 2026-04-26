@@ -49,9 +49,13 @@ export default function LiveDetectionPage() {
     async (id: number) => {
       const updated = await log.runEstimate(id, vehicle);
       if (!updated) return;
-      if (REPAIR_TYPES.has(updated.className)) {
+      // Skip dialog when the estimator was blocked (e.g. panel not yet
+      // identified) or the API failed — the inline error in DamageLog
+      // already surfaces the reason.
+      if (updated.estimateError) return;
+      if (REPAIR_TYPES.has(updated.className) && updated.estimate) {
         setOpenEstimate(updated);
-      } else {
+      } else if (updated.vendors) {
         setOpenVendors(updated);
       }
     },
