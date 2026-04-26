@@ -12,7 +12,7 @@
 import * as ort from "onnxruntime-web";
 
 import type { Bbox } from "./iou";
-import { panelOverlapScore } from "./iou";
+import { panelOverlapScore, YOLO_PAD_COLOR } from "./iou";
 
 /**
  * Parts-segmentation model version. See detector.ts:DAMAGE_MODEL_VERSION
@@ -22,7 +22,25 @@ export const PARTS_MODEL_VERSION = "v1";
 const MODEL_URL = `/models/parts.${PARTS_MODEL_VERSION}.onnx`;
 const MODEL_CACHE = `carper-parts-model-${PARTS_MODEL_VERSION}`;
 const INPUT_SIZE = 640;
-const CONF_THRESHOLD = 0.1;
+// Minimum confidence to even consider a part detection.
+//
+// The parts model has weak calibration — most legitimate predictions land
+// at 0.10–0.25, with high-confidence (>0.4) predictions being the
+// exception rather than the rule. We keep this at the original 0.10 so
+// real panels aren't dropped. The improvements from F-11 that survive
+// are: skipping the "object" catch-all class, which was the actual
+// source of mislabels (see SKIP_PART_KEYS below).
+//
+// Reaching real precision here requires retraining the parts model on
+// labelled data — not threshold tuning. Tracked in
+// docs/live-detection-analysis/07-yolo-detection-deep-dive.md.
+const CONF_THRESHOLD = 0.10;
+
+// Generic catch-all class. The parts model emits "object" when it isn't
+// sure what's in front of it — accepting it as a real panel guess is the
+// fastest way to label things as "Other". This filter alone removed most
+// of the panel-mislabelling we used to see, without sacrificing recall.
+const SKIP_PART_KEYS = new Set(["object"]);
 
 // Exact model class order (index = classId)
 export const PART_CLASS_KEYS = [
@@ -191,7 +209,7 @@ export async function identifyPanel(
     const dx = (INPUT_SIZE - nw) / 2;
     const dy = (INPUT_SIZE - nh) / 2;
 
-    offCtx.fillStyle = "#808080";
+    offCtx.fillStyle = YOLO_PAD_COLOR;
     offCtx.fillRect(0, 0, INPUT_SIZE, INPUT_SIZE);
     offCtx.drawImage(videoEl, dx, dy, nw, nh);
 
@@ -222,6 +240,12 @@ export async function identifyPanel(
       if (conf < CONF_THRESHOLD) continue;
 
       const classId = Math.round(data[base + 5]);
+      // Skip the generic "object" catch-all (F-11): when the model isn't
+      // sure, it tends to pick this with low confidence and pollute the
+      // overlap-score selection.
+      const partKey = PART_CLASS_KEYS[classId];
+      if (partKey && SKIP_PART_KEYS.has(partKey)) continue;
+
       const x1 = Math.max(0, (data[base + 0] - dx) / scale);
       const y1 = Math.max(0, (data[base + 1] - dy) / scale);
       const x2 = Math.min(vw, (data[base + 2] - dx) / scale);

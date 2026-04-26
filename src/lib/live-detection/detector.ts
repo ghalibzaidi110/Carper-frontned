@@ -1,8 +1,8 @@
 import * as ort from "onnxruntime-web";
 
-import { CLASS_NAMES } from "./classes";
+import { CLASS_NAMES, classMinConfidence, classNmsIou } from "./classes";
 import type { Bbox } from "./iou";
-import { iou } from "./iou";
+import { iou, YOLO_PAD_COLOR } from "./iou";
 import type { Detection } from "./tracks";
 
 // Match the version installed locally (see package.json -> onnxruntime-web)
@@ -53,6 +53,19 @@ async function cachedFetch(url: string): Promise<ArrayBuffer> {
 /** Load YOLOv8n damage-detection model (cached after first download). */
 export async function loadDamageModel(url: string = MODEL_URL): Promise<ort.InferenceSession> {
   if (session) return session;
+  // One-time visibility into active config (F-8, F-9, F-10 verification).
+  // Logs only on the first load; subsequent calls return the cached session.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { CLASS_CONF_THRESHOLDS, CLASS_NMS_IOU } = await import("./classes");
+  console.log(
+    "[live-detection] Active config:",
+    {
+      modelVersion: DAMAGE_MODEL_VERSION,
+      letterboxPadColor: YOLO_PAD_COLOR,         // F-10
+      perClassConfidenceFloors: CLASS_CONF_THRESHOLDS,  // F-8
+      perClassNmsIou: CLASS_NMS_IOU,                    // F-9
+    },
+  );
   const buf = await cachedFetch(url);
   session = await ort.InferenceSession.create(buf, {
     executionProviders: ["wasm"],
@@ -91,7 +104,7 @@ export async function detectDamage(
   const dx = (INPUT_SIZE - nw) / 2;
   const dy = (INPUT_SIZE - nh) / 2;
 
-  offCtx.fillStyle = "#808080";
+  offCtx.fillStyle = YOLO_PAD_COLOR;
   offCtx.fillRect(0, 0, INPUT_SIZE, INPUT_SIZE);
   offCtx.drawImage(source as CanvasImageSource, dx, dy, nw, nh);
 
@@ -118,6 +131,10 @@ export async function detectDamage(
   const raw: Detection[] = [];
 
   for (let i = 0; i < numBoxes; i++) {
+    // Pick the class with the highest score for this box. We start from
+    // the user's global threshold; the per-class floor (F-8) is applied
+    // AFTER we know which class won, so a high-conf detection of an
+    // easy class isn't suppressed by a stricter class' rule.
     let maxScore = threshold;
     let maxCls = 0;
     for (let c = 0; c < numCls; c++) {
@@ -128,6 +145,30 @@ export async function detectDamage(
       }
     }
     if (maxScore <= threshold) continue;
+
+    // Apply the per-class minimum (F-8). Some classes (glass_shatter,
+    // tire_flat) need higher confidence than others to keep false-positive
+    // rates manageable.
+    const className = CLASS_NAMES[maxCls] ?? `class_${maxCls}`;
+    const classFloor = classMinConfidence(className);
+
+    // Optional debug: enable from DevTools console with
+    //   localStorage.setItem("debugLiveDet", "1")
+    // and the loop will log each per-class accept/reject. Disable with
+    //   localStorage.removeItem("debugLiveDet")
+    if (
+      typeof window !== "undefined" &&
+      window.localStorage?.getItem("debugLiveDet") === "1"
+    ) {
+      const verdict = maxScore < classFloor ? "REJECTED" : "kept";
+      // eslint-disable-next-line no-console
+      console.log(
+        `[F-8] ${verdict.padEnd(8)} ${className.padEnd(14)} ` +
+          `conf ${maxScore.toFixed(2)}  floor ${classFloor.toFixed(2)}`,
+      );
+    }
+
+    if (maxScore < classFloor) continue;
 
     const cx = data[i];
     const cy = data[numBoxes + i];
@@ -150,22 +191,34 @@ export async function detectDamage(
 
     raw.push({
       classId: maxCls,
-      className: CLASS_NAMES[maxCls] ?? `class_${maxCls}`,
+      className,
       confidence: maxScore,
       bbox: [x1, y1, x2 - x1, y2 - y1] as Bbox,
     });
   }
 
-  return nms(raw, 0.5);
+  return nms(raw);
 }
 
-/** Class-aware greedy NMS — only suppress boxes of the same class. */
-function nms(dets: Detection[], iouThresh: number): Detection[] {
+/**
+ * Class-aware greedy NMS with per-class IoU thresholds (F-9).
+ *
+ * For each candidate (sorted by confidence desc), suppress it if a higher-
+ * confidence box of the SAME class overlaps it more than the threshold
+ * configured for that class. Cross-class boxes never compete — a dent
+ * and a scratch overlapping is fine, both are real.
+ *
+ * Threshold per class is tuned so long, easily-fragmented damages
+ * (scratches) are merged aggressively, while clustered discrete damages
+ * (tire_flat) are kept separate.
+ */
+function nms(dets: Detection[]): Detection[] {
   dets.sort((a, b) => b.confidence - a.confidence);
   const keep: Detection[] = [];
   for (const d of dets) {
+    const thresh = classNmsIou(d.className);
     const suppressed = keep.some(
-      (k) => k.classId === d.classId && iou(d.bbox, k.bbox) > iouThresh,
+      (k) => k.classId === d.classId && iou(d.bbox, k.bbox) > thresh,
     );
     if (!suppressed) keep.push(d);
   }

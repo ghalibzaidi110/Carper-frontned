@@ -1,6 +1,17 @@
 /**
  * Bounding-box overlap utilities. All boxes are [x, y, w, h] in pixel coords.
+ *
+ * Also exports a shared constant for the YOLO letterbox pad color.
  */
+
+/**
+ * Letterbox pad color used when resizing video frames to YOLO's 640×640
+ * input. YOLOv8 models exported via ultralytics are trained with
+ * (114, 114, 114) — i.e. `#727272` — gray padding. We were previously
+ * using `#808080` (128) which is a small but real distribution shift,
+ * hurting detections near the edge of the frame (F-10).
+ */
+export const YOLO_PAD_COLOR = "#727272";
 
 export type Bbox = [number, number, number, number];
 
