@@ -2,6 +2,14 @@
  * Static vehicle catalog for the live-detection page (Pakistan market).
  * Used to populate make/model/year selectors and to inform the cost
  * estimation request.
+ *
+ * ⚠️ F-5: This list MUST stay in sync with the cost model's known
+ * vehicles (KNOWN_MAKES / KNOWN_MODELS in c_python/app/cost.py). A
+ * make/model that appears here but not in the Python list gets the
+ * "+7% per unknown feature" widening on every estimate — silently.
+ *
+ * Source of truth: GET /api/v1/live-detection/known-vehicles
+ * Use `validateAgainstCanonical()` below in dev to detect drift.
  */
 
 export interface VehicleModelEntry {
@@ -114,4 +122,35 @@ export function clampYear(modelEntry: VehicleModelEntry, year: number): number {
   if (year < modelEntry.min) return modelEntry.min;
   if (year > modelEntry.max) return modelEntry.max;
   return year;
+}
+
+/**
+ * F-5: Compare the hardcoded VEHICLE_DATA above against the canonical
+ * list returned by the cost model. Logs warnings if any make or model
+ * appears in the UI but not in the model's training vocabulary (which
+ * would silently degrade cost-estimate accuracy).
+ *
+ * Pure data check — no network call. Pass the canonical list (fetched
+ * via `liveDetectionService.knownVehicles()`) as the argument.
+ *
+ * Returns the diff so callers can surface in dev tooling, telemetry,
+ * etc. Empty arrays mean we're in sync.
+ */
+export function diffAgainstCanonical(canonical: {
+  makes: string[];
+  models: string[];
+}): { unknownMakes: string[]; unknownModels: string[] } {
+  const canonicalMakes = new Set(canonical.makes);
+  const canonicalModels = new Set(canonical.models);
+
+  const unknownMakes: string[] = [];
+  const unknownModels: string[] = [];
+
+  for (const make of Object.keys(VEHICLE_DATA) as VehicleMake[]) {
+    if (!canonicalMakes.has(make)) unknownMakes.push(make);
+    for (const m of VEHICLE_DATA[make]) {
+      if (!canonicalModels.has(m.model)) unknownModels.push(`${make}|${m.model}`);
+    }
+  }
+  return { unknownMakes, unknownModels };
 }

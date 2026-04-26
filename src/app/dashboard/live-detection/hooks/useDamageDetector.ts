@@ -2,8 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { loadDamageModel } from "@/lib/live-detection/detector";
-import { preloadPartModel } from "@/lib/live-detection/part-segmenter";
+import { pruneOldCaptures } from "@/lib/live-detection/capture-store";
+import { loadDamageModel, releaseDamageModel } from "@/lib/live-detection/detector";
+import { preloadPartModel, releasePartModel } from "@/lib/live-detection/part-segmenter";
+import { diffAgainstCanonical } from "@/lib/live-detection/vehicle";
+import { liveDetectionService } from "@/services/live-detection.service";
 
 export type ModelStatus = "idle" | "loading" | "ready" | "error";
 
@@ -29,6 +32,34 @@ export function useDamageDetector(): UseDamageDetector {
     let cancelled = false;
     (async () => {
       setStatus("loading");
+      // F-4: clear out IndexedDB captures older than 30 days. Fire-and-
+      // forget — failures don't block the page (a full disk shouldn't
+      // either, since saveCapture() handles its own errors).
+      void pruneOldCaptures(30).catch(() => {});
+
+      // F-5: in dev, check the hardcoded vehicle dropdown against the
+      // cost model's canonical vehicle list and warn on drift. Silently
+      // skips in production (the warning is for developers, not users).
+      if (process.env.NODE_ENV !== "production") {
+        void liveDetectionService
+          .knownVehicles()
+          .then((canonical) => {
+            const diff = diffAgainstCanonical(canonical);
+            if (diff.unknownMakes.length || diff.unknownModels.length) {
+              // eslint-disable-next-line no-console
+              console.warn(
+                "[F-5] Vehicle dropdown drift — these entries are NOT in the cost model's training vocabulary:\n" +
+                  (diff.unknownMakes.length ? `  Makes:  ${diff.unknownMakes.join(", ")}\n` : "") +
+                  (diff.unknownModels.length ? `  Models: ${diff.unknownModels.join(", ")}\n` : "") +
+                  "  Estimates for these vehicles will get the +7% per-unknown penalty.",
+              );
+            }
+          })
+          .catch(() => {
+            // Backend may not be running yet — silent.
+          });
+      }
+
       try {
         await loadDamageModel();
         if (cancelled) return;
@@ -46,6 +77,15 @@ export function useDamageDetector(): UseDamageDetector {
 
     return () => {
       cancelled = true;
+      // F-3: free the ONNX sessions when the page unmounts so WASM heap
+      // (~80–100 MB combined for both models) is reclaimed. Sessions get
+      // reloaded from the browser cache if the user comes back, so this
+      // is essentially free in user-perceived latency.
+      void releaseDamageModel();
+      void releasePartModel();
+      // Allow the next mount to start fresh (otherwise startedRef.current
+      // stays true and the effect skips re-loading).
+      startedRef.current = false;
     };
   }, []);
 

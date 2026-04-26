@@ -33,6 +33,31 @@ function ensureBuffers() {
   }
 }
 
+/**
+ * F-1: Delete any browser Cache API entries for the damage model under
+ * older version names. Runs once on first model load, so users who had
+ * `carper-damage-model-v0` (or any non-current version) cached don't
+ * keep ~12 MB of dead model bytes around forever after a version bump.
+ */
+async function purgeOldDamageCaches(currentVersion: string): Promise<void> {
+  if (typeof caches === "undefined") return;
+  try {
+    const keys = await caches.keys();
+    const stale = keys.filter(
+      (k) =>
+        k.startsWith("carper-damage-model-") &&
+        !k.endsWith(`-${currentVersion}`),
+    );
+    await Promise.all(stale.map((k) => caches.delete(k)));
+    if (stale.length) {
+      // eslint-disable-next-line no-console
+      console.log(`[F-1] Purged ${stale.length} stale damage-model cache(s):`, stale);
+    }
+  } catch (e) {
+    console.warn("[F-1] purge old damage caches failed:", (e as Error).message);
+  }
+}
+
 async function cachedFetch(url: string): Promise<ArrayBuffer> {
   try {
     const cache = await caches.open(MODEL_CACHE);
@@ -53,6 +78,9 @@ async function cachedFetch(url: string): Promise<ArrayBuffer> {
 /** Load YOLOv8n damage-detection model (cached after first download). */
 export async function loadDamageModel(url: string = MODEL_URL): Promise<ort.InferenceSession> {
   if (session) return session;
+  // F-1: clean up cache entries for older model versions before we open
+  // ours. Cheap (one Cache API listing) and runs only on first load.
+  await purgeOldDamageCaches(DAMAGE_MODEL_VERSION);
   // One-time visibility into active config (F-8, F-9, F-10 verification).
   // Logs only on the first load; subsequent calls return the cached session.
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -77,6 +105,28 @@ export async function loadDamageModel(url: string = MODEL_URL): Promise<ort.Infe
 
 export function isDamageModelLoaded(): boolean {
   return session !== null;
+}
+
+/**
+ * F-3: Free the ONNX session and inference buffers. ORT sessions hold
+ * native WASM memory (~30–60 MB each); without an explicit release they
+ * sit there until the tab is closed. We call this from the
+ * `useDamageDetector` cleanup so navigating away from /live-detection
+ * actually frees the memory.
+ *
+ * Safe to call when nothing's loaded (no-ops).
+ */
+export async function releaseDamageModel(): Promise<void> {
+  if (!session) return;
+  try {
+    await session.release();
+  } catch (e) {
+    console.warn("[detector] release session failed:", (e as Error).message);
+  }
+  session = null;
+  f32Buffer = null;
+  offscreen = null;
+  offCtx = null;
 }
 
 export type DetectionSource = HTMLVideoElement | HTMLCanvasElement | ImageBitmap;

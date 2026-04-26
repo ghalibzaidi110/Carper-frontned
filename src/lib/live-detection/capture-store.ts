@@ -81,3 +81,57 @@ export async function clearCaptures(): Promise<void> {
     req.onerror = (e) => reject((e.target as IDBRequest).error);
   });
 }
+
+/**
+ * F-4: Delete captures older than `maxAgeDays`. Default is 30 days, which
+ * gives users a reasonable retention window without unbounded growth in
+ * IndexedDB. Returns the number of records deleted.
+ *
+ * Called once on first model load (from `useDamageDetector`) so cleanup
+ * happens automatically without UI surface area. Heavy users still hit
+ * the limit eventually, but ~30 days of crops is well under typical
+ * browser quotas (~1 GB).
+ */
+export async function pruneOldCaptures(maxAgeDays = 30): Promise<number> {
+  const d = await openDB();
+  const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+  return new Promise((resolve, reject) => {
+    const tx = d.transaction(STORE, "readwrite");
+    const store = tx.objectStore(STORE);
+    const req = store.openCursor();
+    let deleted = 0;
+    req.onsuccess = (e) => {
+      const cursor = (e.target as IDBRequest<IDBCursorWithValue>).result;
+      if (!cursor) {
+        if (deleted > 0) {
+          // eslint-disable-next-line no-console
+          console.log(`[F-4] Pruned ${deleted} capture(s) older than ${maxAgeDays} day(s)`);
+        }
+        resolve(deleted);
+        return;
+      }
+      const record = cursor.value as CaptureRecord;
+      const ts = record.timestamp ? Date.parse(record.timestamp) : 0;
+      if (ts && ts < cutoff) {
+        cursor.delete();
+        deleted++;
+      }
+      cursor.continue();
+    };
+    req.onerror = (e) => reject((e.target as IDBRequest).error);
+  });
+}
+
+/**
+ * Get a quick storage summary — used by any future UI that wants to
+ * surface "you have N captures using X MB" to the user.
+ */
+export async function getCaptureStats(): Promise<{ count: number; bytes: number }> {
+  const captures = await getCaptures();
+  // Each dataUrl is base64 — bytes ≈ length × 3/4. Cheap approximation.
+  const bytes = captures.reduce(
+    (sum, c) => sum + Math.round(((c.dataUrl?.length ?? 0) * 3) / 4),
+    0,
+  );
+  return { count: captures.length, bytes };
+}

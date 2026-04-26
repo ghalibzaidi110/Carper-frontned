@@ -121,4 +121,20 @@ export const liveDetectionService = {
     const { data } = await apiClient.get("/live-detection/health");
     return data.data;
   },
+
+  /**
+   * F-5: Fetch the canonical list of vehicles the cost model knows.
+   * Use to validate the frontend's hardcoded dropdown — if a make/model
+   * appears in the UI but not here, the model treats it as "unknown" and
+   * widens the cost-estimate error band.
+   */
+  async knownVehicles(): Promise<{
+    modelVersion: string | null;
+    makes: string[];
+    models: string[];
+    panels: string[];
+  }> {
+    const { data } = await apiClient.get("/live-detection/known-vehicles");
+    return data.data;
+  },
 };

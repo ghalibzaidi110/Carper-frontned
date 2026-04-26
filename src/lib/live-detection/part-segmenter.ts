@@ -137,12 +137,39 @@ async function cachedFetch(url: string): Promise<ArrayBuffer> {
   }
 }
 
+/**
+ * F-1: Delete browser Cache API entries for parts model under any
+ * non-current version. Mirrors the same logic in detector.ts so a single
+ * version bump fully reclaims storage for both ONNX models.
+ */
+async function purgeOldPartCaches(currentVersion: string): Promise<void> {
+  if (typeof caches === "undefined") return;
+  try {
+    const keys = await caches.keys();
+    const stale = keys.filter(
+      (k) =>
+        k.startsWith("carper-parts-model-") &&
+        !k.endsWith(`-${currentVersion}`),
+    );
+    await Promise.all(stale.map((k) => caches.delete(k)));
+    if (stale.length) {
+      // eslint-disable-next-line no-console
+      console.log(`[F-1] Purged ${stale.length} stale parts-model cache(s):`, stale);
+    }
+  } catch (e) {
+    console.warn("[F-1] purge old parts caches failed:", (e as Error).message);
+  }
+}
+
 let loadingPromise: Promise<void> | null = null;
 
 async function ensureModel(): Promise<void> {
   if (partSession) return;
   if (!loadingPromise) {
     loadingPromise = (async () => {
+      // F-1: clean up cache entries for older parts-model versions before
+      // we open ours.
+      await purgeOldPartCaches(PARTS_MODEL_VERSION);
       const buf = await cachedFetch(MODEL_URL);
       partSession = await ort.InferenceSession.create(buf, {
         executionProviders: ["wasm"],
@@ -165,6 +192,26 @@ export async function preloadPartModel(): Promise<void> {
 
 export function isPartModelLoaded(): boolean {
   return partSession !== null;
+}
+
+/**
+ * F-3: Free the parts-segmenter ONNX session and inference buffers.
+ * Mirrors `releaseDamageModel()` in detector.ts. Called from the
+ * `useDamageDetector` cleanup hook so leaving the live-detection page
+ * gives the user back ~30–60 MB of WASM heap.
+ */
+export async function releasePartModel(): Promise<void> {
+  if (!partSession) return;
+  try {
+    await partSession.release();
+  } catch (e) {
+    console.warn("[part-segmenter] release session failed:", (e as Error).message);
+  }
+  partSession = null;
+  loadingPromise = null;
+  f32Buf = null;
+  offscreen = null;
+  offCtx = null;
 }
 
 function getPartName(classId: number): string {

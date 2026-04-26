@@ -1,7 +1,7 @@
 "use client";
 
 import { ShieldAlert } from "lucide-react";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import DashboardLayout from "@/components/DashboardLayout";
 import { DEFAULT_VEHICLE, type Vehicle } from "@/lib/live-detection/vehicle";
@@ -79,6 +79,20 @@ export default function LiveDetectionPage() {
     if (!secureContext.ok) return; // banner already explains why
     void camera.start();
   }, [secureContext.ok, camera]);
+
+  // F-2: pause the camera when the tab goes hidden so the phone doesn't
+  // burn battery + cellular data decoding video the user can't see. The
+  // user re-clicks Start when they return — explicit by design (we don't
+  // want to silently re-grant camera permission on tab focus).
+  useEffect(() => {
+    const onVis = () => {
+      if (document.hidden && camera.status === "active") {
+        camera.stop();
+      }
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [camera]);
 
   const handleCapture = useCallback(() => {
     const video = camera.videoRef.current;
