@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import DashboardLayout from "@/components/DashboardLayout";
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
 import { useAdminUsers, useAdminStats, useAdminUpdateUser } from "@/hooks/use-api";
@@ -31,8 +30,7 @@ export default function AdminUsersPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
         <h1 className="text-2xl font-display font-bold text-foreground">User Management</h1>
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -128,6 +126,5 @@ export default function AdminUsersPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }

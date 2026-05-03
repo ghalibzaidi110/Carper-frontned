@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import DashboardLayout from "@/components/DashboardLayout";
 import { useUserCars, useCreateListing } from "@/hooks/use-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatPKR } from "@/lib/format";
@@ -117,8 +116,7 @@ export default function CreateListingPage() {
   const allRequirementsMet = requirements.every((r) => r.met);
 
   return (
-    <DashboardLayout>
-      <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Link
@@ -339,7 +337,6 @@ export default function CreateListingPage() {
           </div>
         </form>
       </div>
-    </DashboardLayout>
   );
 }
 

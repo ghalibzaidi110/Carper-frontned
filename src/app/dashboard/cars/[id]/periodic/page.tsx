@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import DashboardLayout from "@/components/DashboardLayout";
 import { useCarById, useUploadPeriodicImages } from "@/hooks/use-api";
 import { Upload, X, Loader2, ChevronLeft, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -33,24 +32,20 @@ export default function UploadPeriodicImagesPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     );
   }
 
   if (!car) {
     return (
-      <DashboardLayout>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground mb-4">Car not found</p>
-          <Link href="/dashboard/cars" className="text-primary hover:underline">
-            Back to My Cars
-          </Link>
-        </div>
-      </DashboardLayout>
+      <div className="text-center py-12">
+        <p className="text-muted-foreground mb-4">Car not found</p>
+        <Link href="/dashboard/cars" className="text-primary hover:underline">
+          Back to My Cars
+        </Link>
+      </div>
     );
   }
 
@@ -116,8 +111,7 @@ export default function UploadPeriodicImagesPage() {
   const allImagesUploaded = imageFiles.front && imageFiles.back && imageFiles.left && imageFiles.right;
 
   return (
-    <DashboardLayout>
-      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Link
@@ -220,7 +214,6 @@ export default function UploadPeriodicImagesPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }
 

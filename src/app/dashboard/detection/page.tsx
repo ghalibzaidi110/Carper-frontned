@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useMemo, useEffect } from "react";
-import DashboardLayout from "@/components/DashboardLayout";
 import { useUserCars, useDamageHistory, useDetectCar, useDetectImage, useDamageScan } from "@/hooks/use-api";
 import { reportsService } from "@/services/reports.service";
 import { useAuth } from "@/contexts/AuthContext";
@@ -112,8 +111,7 @@ export default function DamageDetectionPage() {
   const latestResults = Array.isArray(history) ? history : [];
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">Damage Detection</h1>
@@ -522,6 +520,5 @@ export default function DamageDetectionPage() {
         </div>
         */}
       </div>
-    </DashboardLayout>
   );
 }

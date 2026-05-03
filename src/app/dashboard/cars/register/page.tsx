@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import DashboardLayout from "@/components/DashboardLayout";
 import { useManufacturers, useModelsByManufacturer, useCatalog } from "@/hooks/use-api";
 import { useRegisterCar, useUploadRegistrationImages } from "@/hooks/use-api";
 import { formatPKR } from "@/lib/format";
@@ -249,8 +248,7 @@ export default function RegisterCarPage() {
   const canProceedStep3 = imageFiles.front && imageFiles.back && imageFiles.left && imageFiles.right;
 
   return (
-    <DashboardLayout>
-      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground">Register New Car</h1>
@@ -598,7 +596,6 @@ export default function RegisterCarPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }
 

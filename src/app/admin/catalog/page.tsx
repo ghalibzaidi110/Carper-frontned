@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import DashboardLayout from "@/components/DashboardLayout";
 import { useCatalog, useDeleteCatalog, useCreateCatalog } from "@/hooks/use-api";
 import { formatPKR } from "@/lib/format";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
@@ -33,8 +32,7 @@ export default function AdminCatalogPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">Car Catalog</h1>
@@ -127,6 +125,5 @@ export default function AdminCatalogPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }

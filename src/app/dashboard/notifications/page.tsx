@@ -1,6 +1,5 @@
 "use client";
 
-import DashboardLayout from "@/components/DashboardLayout";
 import StatusBadge from "@/components/StatusBadge";
 import { useNotifications, useMarkAsRead, useMarkAllAsRead, useDeleteNotification } from "@/hooks/use-api";
 import { getTimeAgo } from "@/lib/format";
@@ -16,8 +15,7 @@ export default function NotificationsPage() {
   const notifications = Array.isArray(rawNotifs) ? rawNotifs : rawNotifs?.data || [];
 
   return (
-    <DashboardLayout>
-      <div className="max-w-3xl space-y-6 animate-fade-in">
+    <div className="max-w-3xl space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-display font-bold text-foreground">Notifications</h1>
           <button
@@ -69,6 +67,5 @@ export default function NotificationsPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }

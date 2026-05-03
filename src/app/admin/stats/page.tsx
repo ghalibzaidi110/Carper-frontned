@@ -1,6 +1,5 @@
 "use client";
 
-import DashboardLayout from "@/components/DashboardLayout";
 import StatCard from "@/components/StatCard";
 import { useAdminStats } from "@/hooks/use-api";
 import { Users, Car, ShoppingCart, Truck, Shield, Ban, BarChart3, TrendingUp, Loader2 } from "lucide-react";
@@ -14,8 +13,7 @@ export default function AdminStatsPage() {
   const rentals = stats?.rentals || {};
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
         <h1 className="text-2xl font-display font-bold text-foreground">Platform Statistics</h1>
 
         {isLoading ? (
@@ -63,6 +61,5 @@ export default function AdminStatsPage() {
           </>
         )}
       </div>
-    </DashboardLayout>
   );
 }

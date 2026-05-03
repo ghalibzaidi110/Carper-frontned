@@ -1,6 +1,5 @@
 "use client";
 
-import DashboardLayout from "@/components/DashboardLayout";
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,8 +22,7 @@ export default function DashboardPage() {
   const userCars = Array.isArray(cars) ? cars : cars?.data || [];
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground">Welcome back, {user?.name?.split(" ")[0]}!</h1>
           <p className="text-sm text-muted-foreground mt-1">Here&apos;s what&apos;s happening with your vehicles.</p>
@@ -104,6 +102,5 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }

@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import DashboardLayout from "@/components/DashboardLayout";
 import StatusBadge from "@/components/StatusBadge";
 import {
   useCarById,
@@ -50,24 +49,20 @@ export default function CarDetailPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     );
   }
 
   if (!car) {
     return (
-      <DashboardLayout>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground mb-4">Car not found</p>
-          <Link href="/dashboard/cars" className="text-primary hover:underline">
-            Back to My Cars
-          </Link>
-        </div>
-      </DashboardLayout>
+      <div className="text-center py-12">
+        <p className="text-muted-foreground mb-4">Car not found</p>
+        <Link href="/dashboard/cars" className="text-primary hover:underline">
+          Back to My Cars
+        </Link>
+      </div>
     );
   }
 
@@ -111,8 +106,7 @@ export default function CarDetailPage() {
   ];
 
   return (
-    <DashboardLayout>
-      <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -468,7 +462,6 @@ export default function CarDetailPage() {
           )}
         </div>
       </div>
-    </DashboardLayout>
   );
 }
 

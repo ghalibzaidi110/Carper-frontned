@@ -1,6 +1,5 @@
 "use client";
 
-import DashboardLayout from "@/components/DashboardLayout";
 import StatusBadge from "@/components/StatusBadge";
 import { useMyListings, useUpdateListingStatus } from "@/hooks/use-api";
 import { formatPKR, formatDate } from "@/lib/format";
@@ -17,8 +16,7 @@ export default function MyListingsPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">My Listings</h1>
@@ -80,6 +78,5 @@ export default function MyListingsPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }

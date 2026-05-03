@@ -1,6 +1,5 @@
 "use client";
 
-import DashboardLayout from "@/components/DashboardLayout";
 import StatusBadge from "@/components/StatusBadge";
 import { useUserCars, useDeleteCar } from "@/hooks/use-api";
 import { Plus, Eye, Pencil, Trash2, Upload, Loader2 } from "lucide-react";
@@ -18,8 +17,7 @@ export default function MyCarsPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-display font-bold text-foreground">My Cars</h1>
@@ -92,6 +90,5 @@ export default function MyCarsPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }

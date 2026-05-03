@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import DashboardLayout from "@/components/DashboardLayout";
 import StatusBadge from "@/components/StatusBadge";
 import {
   useRentalById,
@@ -48,24 +47,20 @@ export default function RentalDetailPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
     );
   }
 
   if (!rental) {
     return (
-      <DashboardLayout>
-        <div className="text-center py-12">
-          <p className="text-muted-foreground mb-4">Rental not found</p>
-          <Link href="/dashboard/rentals" className="text-primary hover:underline">
-            Back to Rentals
-          </Link>
-        </div>
-      </DashboardLayout>
+      <div className="text-center py-12">
+        <p className="text-muted-foreground mb-4">Rental not found</p>
+        <Link href="/dashboard/rentals" className="text-primary hover:underline">
+          Back to Rentals
+        </Link>
+      </div>
     );
   }
 
@@ -148,8 +143,7 @@ export default function RentalDetailPage() {
   const regNumber = car?.registrationNumber || "";
 
   return (
-    <DashboardLayout>
-      <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -499,7 +493,6 @@ export default function RentalDetailPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }
 

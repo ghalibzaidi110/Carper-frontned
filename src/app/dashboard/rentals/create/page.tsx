@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import DashboardLayout from "@/components/DashboardLayout";
 import { useUserCars, useCreateRental } from "@/hooks/use-api";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatPKR } from "@/lib/format";
@@ -82,8 +81,7 @@ export default function CreateRentalPage() {
   const catalogCar = selectedCar?.catalogCar as Record<string, unknown> | undefined;
 
   return (
-    <DashboardLayout>
-      <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
+    <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex items-center gap-4">
           <Link
@@ -356,7 +354,6 @@ export default function CreateRentalPage() {
           </div>
         </form>
       </div>
-    </DashboardLayout>
   );
 }
 

@@ -3,7 +3,6 @@
 import { ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import DashboardLayout from "@/components/DashboardLayout";
 import { DEFAULT_VEHICLE, type Vehicle } from "@/lib/live-detection/vehicle";
 import type { Detection } from "@/lib/live-detection/tracks";
 
@@ -118,7 +117,7 @@ export default function LiveDetectionPage() {
   }, [camera.videoRef]);
 
   return (
-    <DashboardLayout>
+    <>
       <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground">
@@ -184,6 +183,6 @@ export default function LiveDetectionPage() {
         vehicle={vehicle}
         onClose={() => setOpenReport(false)}
       />
-    </DashboardLayout>
+    </>
   );
 }

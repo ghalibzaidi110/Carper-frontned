@@ -1,6 +1,5 @@
 "use client";
 
-import DashboardLayout from "@/components/DashboardLayout";
 import StatusBadge from "@/components/StatusBadge";
 import { useAdminVerifications, useAdminUpdateUser } from "@/hooks/use-api";
 import { Eye, CheckCircle, XCircle, Shield, Loader2 } from "lucide-react";
@@ -21,8 +20,7 @@ export default function AdminVerificationsPage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="max-w-4xl space-y-6 animate-fade-in">
+    <div className="max-w-4xl space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground">CNIC Verification Queue</h1>
           <p className="text-sm text-muted-foreground mt-1">{pending.length} pending verifications</p>
@@ -87,6 +85,5 @@ export default function AdminVerificationsPage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   );
 }

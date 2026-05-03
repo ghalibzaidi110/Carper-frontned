@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef } from "react";
-import DashboardLayout from "@/components/DashboardLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import StatusBadge from "@/components/StatusBadge";
 import { useUpdateProfile, useChangePassword, useUploadCnic, useUploadAvatar } from "@/hooks/use-api";
@@ -57,8 +56,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <DashboardLayout>
-      <div className="max-w-3xl space-y-6 animate-fade-in">
+    <div className="max-w-3xl space-y-6 animate-fade-in">
         <h1 className="text-2xl font-display font-bold text-foreground">Profile</h1>
 
         <div className="bg-card rounded-xl border border-border shadow-card p-6">
@@ -208,6 +206,5 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-    </DashboardLayout>
   );
 }
