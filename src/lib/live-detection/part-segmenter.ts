@@ -27,12 +27,17 @@ const INPUT_SIZE = 640;
 // The parts model has weak calibration — most legitimate predictions land
 // at 0.10–0.25, with high-confidence (>0.4) predictions being the
 // exception rather than the rule. We keep this at the original 0.10 so
-// real panels aren't dropped. The improvements from F-11 that survive
-// are: skipping the "object" catch-all class, which was the actual
-// source of mislabels (see SKIP_PART_KEYS below).
+// real panels aren't dropped.
 //
-// Reaching real precision here requires retraining the parts model on
-// labelled data — not threshold tuning. Tracked in
+// Instead of confidence-gating, F-11 mislabel reduction relies on three
+// confidence-independent filters that survived rollout:
+//   1. SKIP_PART_KEYS         — drop the "object" catch-all class
+//   2. DAMAGE_COMPATIBLE_PANELS — only allow physically-possible pairings
+//                                (e.g. tire_flat → wheel only)
+//   3. MIN_PANEL_OVERLAP       — return "unknown" if best overlap < floor
+//
+// Reaching real precision via thresholds requires retraining the parts
+// model on labelled data. Tracked in
 // docs/live-detection-analysis/07-yolo-detection-deep-dive.md.
 const CONF_THRESHOLD = 0.10;
 
@@ -41,6 +46,14 @@ const CONF_THRESHOLD = 0.10;
 // fastest way to label things as "Other". This filter alone removed most
 // of the panel-mislabelling we used to see, without sacrificing recall.
 const SKIP_PART_KEYS = new Set(["object"]);
+
+// F-11: spatial-sanity floor. `panelOverlapScore` blends IoU and
+// containment, both in [0,1]. Even the best panel sometimes only "wins"
+// because it's the least-bad of bad options — its bbox barely brushes
+// the damage. Below this floor we'd rather report "unknown" and let the
+// user pick from the dropdown than guess and feed the wrong panel into
+// the cost model.
+const MIN_PANEL_OVERLAP = 0.05;
 
 // Exact model class order (index = classId)
 export const PART_CLASS_KEYS = [
@@ -70,6 +83,33 @@ export const PART_CLASS_KEYS = [
 ] as const;
 
 export type PartKey = (typeof PART_CLASS_KEYS)[number];
+
+// F-11: damage-class → compatible-panel-set. A `tire_flat` overlapping the
+// hood can only ever be a parts-model error. Same for `glass_shatter` on a
+// bumper or `lamp_broken` on a wheel. By filtering candidates to panels
+// physically capable of carrying that damage type before scoring overlap,
+// we eliminate a whole class of "wrong panel wins by accident" mislabels
+// that the rolled-back confidence-threshold experiment was trying (and
+// failing) to address.
+//
+// `null` means no constraint — body damage (dent / scratch / crack) can
+// land on any panel including glass, so we keep the unfiltered candidate
+// pool for those.
+const DAMAGE_COMPATIBLE_PANELS: Record<string, Set<PartKey> | null> = {
+  tire_flat: new Set<PartKey>(["wheel"]),
+  glass_shatter: new Set<PartKey>(["front_glass", "back_glass"]),
+  lamp_broken: new Set<PartKey>([
+    "back_left_light",
+    "back_light",
+    "back_right_light",
+    "front_left_light",
+    "front_light",
+    "front_right_light",
+  ]),
+  dent: null,
+  scratch: null,
+  crack: null,
+};
 
 export const PART_DISPLAY: Record<PartKey, string> = {
   back_bumper: "Rear Bumper",
@@ -236,10 +276,15 @@ export interface PanelIdentification {
  * Identify the panel at the given damage bbox. Returns the panel key
  * (e.g. "hood") or "unknown" if nothing detected, plus the panel's
  * bounding box for downstream scale calibration.
+ *
+ * `damageClass` (optional) restricts candidate panels to those physically
+ * compatible with the damage type — e.g. `tire_flat` only matches `wheel`.
+ * Omitting it falls back to the original any-panel behaviour. See F-11.
  */
 export async function identifyPanel(
   videoEl: HTMLVideoElement,
   damageBbox: Bbox,
+  damageClass?: string,
 ): Promise<PanelIdentification> {
   try {
     await ensureModel();
@@ -307,15 +352,50 @@ export async function identifyPanel(
       return { panel: "unknown" };
     }
 
-    let bestPart = partDets[0];
+    // F-11: physical-compatibility filter. For damage classes that can
+    // only land on a small set of panels (tire_flat → wheel, glass_shatter
+    // → glass, lamp_broken → lights), restrict candidates to those panels
+    // before picking the best by overlap. If the parts model didn't
+    // detect any compatible panel this frame, return "unknown" rather
+    // than fall back to an unconstrained guess — the user's panel
+    // dropdown is a better answer than e.g. "tire_flat on hood".
+    let candidates = partDets;
+    const compatibleSet = damageClass ? DAMAGE_COMPATIBLE_PANELS[damageClass] : undefined;
+    if (compatibleSet) {
+      const filtered = partDets.filter((p) => {
+        const key = PART_CLASS_KEYS[p.classId];
+        return key !== undefined && compatibleSet.has(key);
+      });
+      if (filtered.length === 0) {
+        console.warn(
+          `[PartSeg] no compatible panel for damage="${damageClass}" — returning unknown`,
+        );
+        return { panel: "unknown" };
+      }
+      candidates = filtered;
+    }
+
+    let bestPart = candidates[0];
     let bestScore = -1;
-    for (const part of partDets) {
+    let bestOverlap = 0;
+    for (const part of candidates) {
       const overlap = panelOverlapScore(damageBbox, part.bbox);
       const score = overlap * part.conf;
       if (score > bestScore) {
         bestScore = score;
+        bestOverlap = overlap;
         bestPart = part;
       }
+    }
+
+    // F-11: spatial-sanity floor. If the winning panel barely overlaps
+    // the damage at all, we're picking "best of bad options" — better
+    // to surface unknown and let the user override.
+    if (bestOverlap < MIN_PANEL_OVERLAP) {
+      console.warn(
+        `[PartSeg] best panel overlap ${bestOverlap.toFixed(3)} below floor ${MIN_PANEL_OVERLAP} — returning unknown`,
+      );
+      return { panel: "unknown" };
     }
 
     return {

@@ -115,10 +115,13 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
       setEntries((prev) => [...prev, entry]);
 
       // Async: identify panel (now also returns the panel bbox + frame
-      // dimensions so we can do panel-as-ruler scaling in the cost API)
+      // dimensions so we can do panel-as-ruler scaling in the cost API).
+      // Pass `det.className` so the segmenter can restrict candidates to
+      // panels physically compatible with the damage type (F-11) — e.g.
+      // a `tire_flat` is only allowed to match a `wheel`.
       const video = videoRef.current;
       if (video) {
-        identifyPanel(video, det.bbox).then((result) => {
+        identifyPanel(video, det.bbox, det.className).then((result) => {
           setEntries((prev) =>
             prev.map((e) =>
               e.id === id
