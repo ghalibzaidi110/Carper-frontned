@@ -2,8 +2,11 @@ export const formatPKR = (amount: number): string => {
   return `₨ ${amount.toLocaleString("en-PK")}`;
 };
 
-export const formatDate = (date: string): string => {
-  return new Date(date).toLocaleDateString("en-PK", {
+export const formatDate = (date: string | null | undefined): string => {
+  if (!date) return "—";
+  const d = new Date(date);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-PK", {
     year: "numeric",
     month: "short",
     day: "numeric",

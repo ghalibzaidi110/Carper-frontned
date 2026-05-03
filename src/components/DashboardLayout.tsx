@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
-  LayoutDashboard, Car, ScanSearch, ShoppingCart, Users, Shield,
-  BarChart3, Bell, UserCircle, LogOut, Menu, X, Truck, Package, Camera
+  LayoutDashboard, Car, ScanSearch, Users, Shield,
+  BarChart3, Bell, UserCircle, LogOut, Menu, X, Truck, Camera, ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUnreadCount } from "@/hooks/use-api";
@@ -35,7 +35,10 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const { user, logout, loading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [hoverExpanded, setHoverExpanded] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const { data: unreadData } = useUnreadCount();
   const unreadCount = unreadData?.unreadCount ?? 0;
 
@@ -45,11 +48,24 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
     }
   }, [user, loading, router]);
 
+  useEffect(() => {
+    if (!profileOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setProfileOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [profileOpen]);
+
   if (loading || !user) return null;
 
   const filteredNav = NAV_ITEMS.filter((item) => item.roles.includes(user.role));
+  const expanded = hoverExpanded || mobileOpen;
 
   const handleLogout = async () => {
+    setProfileOpen(false);
     await logout();
     router.push("/");
   };
@@ -58,81 +74,99 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Sidebar */}
       <aside
+        onMouseEnter={() => setHoverExpanded(true)}
+        onMouseLeave={() => setHoverExpanded(false)}
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-sidebar flex flex-col transition-transform duration-300 lg:static lg:translate-x-0",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          "fixed inset-y-0 left-0 z-50 bg-sidebar flex flex-col border-r border-sidebar-border",
+          "transition-all duration-300 ease-out",
+          // Mobile: slide in/out at full width
+          mobileOpen ? "translate-x-0 w-64" : "-translate-x-full w-64",
+          // Desktop: always visible, width depends on hover
+          "lg:translate-x-0",
+          expanded ? "lg:w-64" : "lg:w-16",
         )}
       >
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-sidebar-border">
-          <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
+        {/* Logo */}
+        <div className="flex items-center gap-3 h-16 px-3 border-b border-sidebar-border overflow-hidden">
+          <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
             <Car size={20} className="text-primary-foreground" />
           </div>
-          <span className="font-display font-bold text-lg text-sidebar-primary-foreground">AutoInspect</span>
+          <span
+            className={cn(
+              "font-display font-bold text-lg text-sidebar-primary-foreground whitespace-nowrap transition-opacity duration-200",
+              expanded ? "opacity-100" : "opacity-0 lg:opacity-0",
+            )}
+          >
+            AutoInspect
+          </span>
         </div>
 
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 space-y-1">
           {filteredNav.map((item) => {
             const isActive = pathname === item.path;
             return (
               <Link
                 key={item.path}
                 href={item.path}
-                onClick={() => setSidebarOpen(false)}
+                onClick={() => setMobileOpen(false)}
+                title={!expanded ? item.label : undefined}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+                  "flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors whitespace-nowrap overflow-hidden",
                   isActive
                     ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
                 )}
               >
-                {item.icon}
-                {item.label}
+                <span className="flex-shrink-0">{item.icon}</span>
+                <span
+                  className={cn(
+                    "transition-opacity duration-200",
+                    expanded ? "opacity-100" : "opacity-0",
+                  )}
+                >
+                  {item.label}
+                </span>
               </Link>
             );
           })}
         </nav>
-
-        <div className="p-4 border-t border-sidebar-border">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="h-9 w-9 rounded-full bg-sidebar-accent flex items-center justify-center text-sm font-semibold text-sidebar-accent-foreground">
-              {user.name.charAt(0)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-sidebar-primary-foreground truncate">{user.name}</p>
-              <p className="text-xs text-sidebar-foreground truncate">{user.role.replace("_", " ")}</p>
-            </div>
-          </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-sidebar-foreground hover:text-destructive rounded-lg hover:bg-sidebar-accent/50 transition-colors"
-          >
-            <LogOut size={16} />
-            Sign Out
-          </button>
-        </div>
       </aside>
 
-      {/* Overlay */}
-      {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-foreground/20 backdrop-blur-sm lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
       )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      {/* Main */}
+      <div
+        className={cn(
+          "flex-1 flex flex-col min-w-0 transition-[padding] duration-300 ease-out",
+          expanded ? "lg:pl-64" : "lg:pl-16",
+        )}
+      >
         <header className="h-16 border-b border-border bg-card flex items-center justify-between px-4 lg:px-6">
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="lg:hidden p-2 rounded-lg hover:bg-muted transition-colors"
-          >
-            {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
-          </button>
-          <div className="hidden lg:block">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setMobileOpen(!mobileOpen)}
+              className="lg:hidden p-2 rounded-lg hover:bg-muted transition-colors"
+            >
+              {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
             <h2 className="font-display text-lg font-semibold text-foreground">
               {filteredNav.find((n) => n.path === pathname)?.label || "Dashboard"}
             </h2>
           </div>
-          <div className="flex items-center gap-3">
-            <Link href="/dashboard/notifications" className="relative p-2 rounded-lg hover:bg-muted transition-colors">
+
+          <div className="flex items-center gap-2">
+            {/* Notifications bell */}
+            <Link
+              href="/dashboard/notifications"
+              className="relative p-2 rounded-lg hover:bg-muted transition-colors"
+            >
               <Bell size={20} className="text-muted-foreground" />
               {unreadCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 h-5 w-5 rounded-full bg-primary text-[10px] font-bold text-primary-foreground flex items-center justify-center">
@@ -140,16 +174,59 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 </span>
               )}
             </Link>
-            <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
-              {user.name.charAt(0)}
+
+            {/* Profile dropdown */}
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                onClick={() => setProfileOpen((v) => !v)}
+                className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-full border border-border hover:bg-muted transition-colors"
+              >
+                <span className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary">
+                  {user.name.charAt(0)}
+                </span>
+                <span className="hidden sm:inline text-sm font-medium text-foreground max-w-[120px] truncate">
+                  {user.name}
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={cn(
+                    "text-muted-foreground transition-transform",
+                    profileOpen && "rotate-180",
+                  )}
+                />
+              </button>
+
+              {profileOpen && (
+                <div className="absolute right-0 mt-2 w-56 rounded-xl border border-border bg-card shadow-elevated overflow-hidden z-50">
+                  <div className="px-4 py-3 border-b border-border">
+                    <p className="text-sm font-semibold text-foreground truncate">{user.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                    <span className="inline-block mt-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold uppercase tracking-wide">
+                      {user.role.replace("_", " ")}
+                    </span>
+                  </div>
+                  <Link
+                    href="/dashboard/profile"
+                    onClick={() => setProfileOpen(false)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm text-foreground hover:bg-muted transition-colors"
+                  >
+                    <UserCircle size={16} />
+                    Profile
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                  >
+                    <LogOut size={16} />
+                    Logout
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-6">
-          {children}
-        </main>
+        <main className="flex-1 overflow-y-auto p-4 lg:p-6">{children}</main>
       </div>
     </div>
   );

@@ -25,9 +25,9 @@ export const useUpdateProfile = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["user-profile"] });
       qc.invalidateQueries({ queryKey: ["auth-user"] });
-      toast.success("Profile updated successfully");
     },
-    onError: () => toast.error("Failed to update profile"),
+    // Caller surfaces the real API error message and shows the success toast
+    // so it can pair the message with what was actually saved.
   });
 };
 
@@ -35,8 +35,8 @@ export const useChangePassword = () =>
   useMutation({
     mutationFn: (payload: { currentPassword: string; newPassword: string }) =>
       usersService.changePassword(payload),
-    onSuccess: () => toast.success("Password changed successfully"),
-    onError: () => toast.error("Failed to change password"),
+    // Toasts intentionally omitted — caller handles success (logout flow) and
+    // surfaces the real API error message instead of a generic one.
   });
 
 export const useUploadCnic = () => {

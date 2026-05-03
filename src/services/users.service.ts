@@ -21,13 +21,51 @@ export const usersService = {
   },
 
   async updateProfile(payload: UpdateProfilePayload) {
-    const { data } = await apiClient.patch("/users/profile", payload);
-    return data.data;
+    try {
+      const { data } = await apiClient.patch("/users/profile", payload);
+      return data.data;
+    } catch (error: any) {
+      const errorData = error?.response?.data;
+      const raw = errorData?.message;
+      let message: string;
+      if (Array.isArray(raw)) {
+        message = raw
+          .map((err: any) =>
+            typeof err === "string"
+              ? err
+              : Object.values(err?.constraints || {}).join(", "),
+          )
+          .filter(Boolean)
+          .join("; ");
+      } else {
+        message = typeof raw === "string" ? raw : "Failed to update profile";
+      }
+      throw new Error(message || "Failed to update profile");
+    }
   },
 
   async changePassword(payload: ChangePasswordPayload) {
-    const { data } = await apiClient.post("/users/change-password", payload);
-    return data.data;
+    try {
+      const { data } = await apiClient.post("/users/change-password", payload);
+      return data.data;
+    } catch (error: any) {
+      const errorData = error?.response?.data;
+      const raw = errorData?.message;
+      let message: string;
+      if (Array.isArray(raw)) {
+        message = raw
+          .map((err: any) =>
+            typeof err === "string"
+              ? err
+              : Object.values(err?.constraints || {}).join(", "),
+          )
+          .filter(Boolean)
+          .join("; ");
+      } else {
+        message = typeof raw === "string" ? raw : "Failed to change password";
+      }
+      throw new Error(message || "Failed to change password");
+    }
   },
 
   async uploadCnic(file: File) {
