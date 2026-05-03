@@ -39,7 +39,7 @@ export default function MarketplacePage() {
             <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
               <Car size={20} className="text-primary-foreground" />
             </div>
-            <span className="font-display font-bold text-xl text-foreground">AutoInspect</span>
+            <span className="font-display font-bold text-xl text-foreground">Carper</span>
           </Link>
           <div className="flex items-center gap-3">
             <Link href="/auth/login" className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">Sign In</Link>

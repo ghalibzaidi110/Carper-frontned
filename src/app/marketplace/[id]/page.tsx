@@ -124,7 +124,7 @@ export default function MarketplaceDetailPage() {
             <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
               <Car size={20} className="text-primary-foreground" />
             </div>
-            <span className="font-display font-bold text-xl text-foreground">AutoInspect</span>
+            <span className="font-display font-bold text-xl text-foreground">Carper</span>
           </Link>
           <Link
             href="/marketplace"

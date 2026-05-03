@@ -31,7 +31,7 @@ export default function LandingPage() {
             <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
               <Car size={20} className="text-primary-foreground" />
             </div>
-            <span className="font-display font-bold text-xl text-foreground">AutoInspect</span>
+            <span className="font-display font-bold text-xl text-foreground">Carper</span>
           </Link>
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
@@ -160,9 +160,9 @@ export default function LandingPage() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
               <Car size={20} className="text-primary" />
-              <span className="font-display font-bold text-foreground">AutoInspect</span>
+              <span className="font-display font-bold text-foreground">Carper</span>
             </div>
-            <p className="text-sm text-muted-foreground">© 2026 AutoInspect. AI-Powered Car Damage Detection Platform.</p>
+            <p className="text-sm text-muted-foreground">© 2026 Carper. AI-Powered Car Damage Detection Platform.</p>
           </div>
         </div>
       </footer>

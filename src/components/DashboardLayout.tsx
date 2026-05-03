@@ -87,22 +87,27 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
         )}
       >
         {/* Logo */}
-        <div className="flex items-center gap-3 h-16 px-3 border-b border-sidebar-border overflow-hidden">
-          <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center flex-shrink-0">
-            <Car size={20} className="text-primary-foreground" />
+        <div className="flex items-center gap-3 h-20 px-4 border-b border-sidebar-border overflow-hidden">
+          <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-md">
+            <Car size={22} className="text-primary-foreground" />
           </div>
-          <span
+          <div
             className={cn(
-              "font-display font-bold text-lg text-sidebar-primary-foreground whitespace-nowrap transition-opacity duration-200",
-              expanded ? "opacity-100" : "opacity-0 lg:opacity-0",
+              "min-w-0 transition-opacity duration-200",
+              expanded ? "opacity-100" : "opacity-0",
             )}
           >
-            AutoInspect
-          </span>
+            <p className="font-display font-bold text-base text-sidebar-primary-foreground tracking-wide whitespace-nowrap">
+              Carper
+            </p>
+            <p className="text-[11px] text-sidebar-accent-foreground/80 whitespace-nowrap">
+              AI Damage Detection
+            </p>
+          </div>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 px-2 space-y-1">
+        <nav className="flex-1 overflow-y-auto overflow-x-hidden py-5 px-3 space-y-1.5">
           {filteredNav.map((item) => {
             const isActive = pathname === item.path;
             return (
@@ -112,16 +117,20 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
                 onClick={() => setMobileOpen(false)}
                 title={!expanded ? item.label : undefined}
                 className={cn(
-                  "flex items-center gap-3 h-10 px-3 rounded-lg text-sm font-medium transition-colors whitespace-nowrap overflow-hidden",
+                  "relative flex items-center gap-3 h-11 px-3 rounded-xl text-sm font-medium transition-colors whitespace-nowrap overflow-hidden",
                   isActive
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground",
+                    ? "bg-primary/10 text-primary"
+                    : "text-sidebar-foreground hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
                 )}
               >
+                {/* Left-edge accent bar for active item */}
+                {isActive && (
+                  <span className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-primary" />
+                )}
                 <span className="flex-shrink-0">{item.icon}</span>
                 <span
                   className={cn(
-                    "transition-opacity duration-200",
+                    "flex-1 transition-opacity duration-200",
                     expanded ? "opacity-100" : "opacity-0",
                   )}
                 >

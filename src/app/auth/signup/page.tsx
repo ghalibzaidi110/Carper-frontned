@@ -100,7 +100,7 @@ function GoogleSignupContent() {
             <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
               <Car size={22} className="text-primary-foreground" />
             </div>
-            <span className="font-display font-bold text-2xl text-foreground">AutoInspect</span>
+            <span className="font-display font-bold text-2xl text-foreground">Carper</span>
           </Link>
           <h1 className="text-2xl font-display font-bold text-foreground">Complete Your Signup</h1>
           <p className="mt-1 text-sm text-muted-foreground">Finish setting up your account</p>

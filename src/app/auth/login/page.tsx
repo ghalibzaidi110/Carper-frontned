@@ -54,7 +54,7 @@ function LoginContent() {
             <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
               <Car size={22} className="text-primary-foreground" />
             </div>
-            <span className="font-display font-bold text-2xl text-foreground">AutoInspect</span>
+            <span className="font-display font-bold text-2xl text-foreground">Carper</span>
           </Link>
           <h1 className="text-2xl font-display font-bold text-foreground">Welcome back</h1>
           <p className="mt-1 text-sm text-muted-foreground">Sign in to your account</p>
