@@ -175,7 +175,14 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
       const areaCm2 = +((bw / pxPerCm) * (bh / pxPerCm)).toFixed(2);
       const perimCm = +((bw + bh) * 2 / pxPerCm).toFixed(2);
 
-      // Repair-flow needs a known panel — mirrors webxr/estimate.js:61-68
+      // Repair-flow: keep the null-guard (race condition: parts model
+      // is still resolving), but DO NOT block on `unknown` anymore.
+      // The Python cost model accepts a missing panelLocation, defaults
+      // its lookup, and returns a real estimate with a +7% wider margin
+      // (see cost.py predict_cost: panel = raw_panel if raw_panel in
+      // KNOWN_PANELS else None → unknown_features += "panelLocation").
+      // Hard-blocking here was discarding usable estimates the backend
+      // would gladly produce — see plan: what-is-this-going-gleaming-peacock.md.
       if (REPAIR_TYPES.has(entry.className)) {
         if (entry.panelLocation === null) {
           const pending: LogEntry = {
@@ -186,15 +193,9 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
           setEntries((prev) => prev.map((e) => (e.id === entry.id ? pending : e)));
           return pending;
         }
-        if (entry.panelLocation === "unknown") {
-          const noPanel: LogEntry = {
-            ...entry,
-            estimateLoading: false,
-            estimateError: "Panel could not be identified — re-scan with the part in frame.",
-          };
-          setEntries((prev) => prev.map((e) => (e.id === entry.id ? noPanel : e)));
-          return noPanel;
-        }
+        // panelLocation === "unknown" intentionally falls through; the
+        // payload sent below sends `panelLocation: undefined` for that
+        // case and Python's fallback path produces a wider-margin estimate.
       }
 
       // Mark loading
@@ -206,12 +207,25 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
 
       try {
         if (REPAIR_TYPES.has(entry.className)) {
+          // When the parts model couldn't ID a panel ("unknown"), drop
+          // the field entirely so Python's predict_cost takes the
+          // missing-panel path (+7% margin) instead of treating the
+          // literal string "unknown" as a panel name.
+          const sendPanel =
+            !entry.panelLocation || entry.panelLocation === "unknown"
+              ? undefined
+              : entry.panelLocation;
+          // Same logic for panelBbox: only send it when we actually
+          // identified a panel (otherwise the panel-as-ruler scaling
+          // would use a bogus bbox).
+          const sendPanelBbox = sendPanel ? (entry.panelBbox ?? undefined) : undefined;
+
           const result = await liveDetectionService.estimateCost({
             className: entry.className,
-            panelLocation: entry.panelLocation ?? undefined,
+            panelLocation: sendPanel,
             // Panel-as-ruler — backend will compute real cm² from these
             // when available, falling back to legacy fixed-distance math.
-            panelBbox: entry.panelBbox ?? undefined,
+            panelBbox: sendPanelBbox,
             frameSize: entry.frameSize ?? undefined,
             vehicleCategory: resolveCategory(vehicle),
             confidence: entry.confidence,

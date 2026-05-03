@@ -17,7 +17,8 @@ interface DamageLogProps {
 }
 
 function panelLabel(panel: string | null): string {
-  if (!panel || panel === "unknown") return "—";
+  if (panel === "unknown") return "—";
+  if (!panel) return "—"; // null = still identifying; caller renders a spinner
   return (PART_DISPLAY as Record<string, string>)[panel] ?? panel;
 }
 
@@ -78,7 +79,17 @@ export function DamageLog({
                   </button>
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground gap-2">
-                  <span className="truncate">Panel: {panelLabel(e.panelLocation)}</span>
+                  <span className="truncate flex items-center gap-1">
+                    Panel:{" "}
+                    {e.panelLocation === null ? (
+                      <>
+                        <Loader2 size={11} className="animate-spin" />
+                        <span>identifying…</span>
+                      </>
+                    ) : (
+                      panelLabel(e.panelLocation)
+                    )}
+                  </span>
                   {cost !== undefined && (
                     <span className="font-mono tabular-nums text-foreground/90">
                       ≈ {cost.toLocaleString()} PKR

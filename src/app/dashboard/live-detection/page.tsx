@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldAlert } from "lucide-react";
+import { ServerCrash, ShieldAlert } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import DashboardLayout from "@/components/DashboardLayout";
@@ -136,6 +136,16 @@ export default function LiveDetectionPage() {
             <div className="text-sm">
               <p className="font-semibold text-foreground">HTTPS required</p>
               <p className="text-muted-foreground mt-1">{secureContext.reason}</p>
+            </div>
+          </div>
+        )}
+
+        {detector.backendHealth && !detector.backendHealth.healthy && (
+          <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 flex items-start gap-3">
+            <ServerCrash size={20} className="text-amber-700 dark:text-amber-400 mt-0.5 shrink-0" />
+            <div className="text-sm">
+              <p className="font-semibold text-foreground">Cost service offline</p>
+              <p className="text-muted-foreground mt-1">{detector.backendHealth.message}</p>
             </div>
           </div>
         )}

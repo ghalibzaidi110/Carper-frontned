@@ -29,12 +29,22 @@ const INPUT_SIZE = 640;
 // exception rather than the rule. We keep this at the original 0.10 so
 // real panels aren't dropped.
 //
-// Instead of confidence-gating, F-11 mislabel reduction relies on three
-// confidence-independent filters that survived rollout:
-//   1. SKIP_PART_KEYS         — drop the "object" catch-all class
-//   2. DAMAGE_COMPATIBLE_PANELS — only allow physically-possible pairings
-//                                (e.g. tire_flat → wheel only)
-//   3. MIN_PANEL_OVERLAP       — return "unknown" if best overlap < floor
+// F-11 mislabel reduction relies on three filters, applied as a tiered
+// preference ladder inside identifyPanel() rather than as hard gates:
+//   1. SKIP_PART_KEYS         — drop the "object" catch-all class (hard)
+//   2. DAMAGE_COMPATIBLE_PANELS — prefer physically-possible pairings
+//                                (e.g. tire_flat → wheel) but accept any
+//                                panel as a graceful fallback when the
+//                                parts model misses the compatible one
+//   3. MIN_PANEL_OVERLAP       — prefer panels meeting the spatial floor
+//                                but accept lower-overlap matches if no
+//                                higher-quality option exists
+//
+// The hard-gate version of (2) and (3) caused 100% "unknown" panels on
+// real footage because the parts model is too unreliable to consistently
+// land in the strict tier — see git history of identifyPanel(). The
+// tiered version preserves quality when the model cooperates and avoids
+// blocking the cost pipeline when it doesn't.
 //
 // Reaching real precision via thresholds requires retraining the parts
 // model on labelled data. Tracked in
@@ -161,19 +171,46 @@ function ensureBuffers() {
   }
 }
 
+// D-6: see detector.ts for rationale. Same 30 s ceiling — keeps the two
+// model fetches behaving consistently when the network is degraded.
+const MODEL_FETCH_TIMEOUT_MS = 30_000;
+
 async function cachedFetch(url: string): Promise<ArrayBuffer> {
+  // Cache lookup is best-effort — failures shouldn't block fetch.
+  let cache: Cache | null = null;
+  if (typeof caches !== "undefined") {
+    try {
+      cache = await caches.open(MODEL_CACHE);
+      const cached = await cache.match(url);
+      if (cached) return cached.arrayBuffer();
+    } catch (e) {
+      console.warn("[part-segmenter] cache lookup failed:", (e as Error).message);
+      cache = null;
+    }
+  }
+
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), MODEL_FETCH_TIMEOUT_MS);
   try {
-    const cache = await caches.open(MODEL_CACHE);
-    const cached = await cache.match(url);
-    if (cached) return cached.arrayBuffer();
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
-    cache.put(url, resp.clone());
-    return resp.arrayBuffer();
-  } catch {
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`Part seg model fetch failed: ${resp.status}`);
-    return resp.arrayBuffer();
+    const resp = await fetch(url, { signal: ctrl.signal });
+    if (!resp.ok) throw new Error(`Parts model fetch failed: ${resp.status}`);
+    if (cache) {
+      cache
+        .put(url, resp.clone())
+        .catch((e) =>
+          console.warn("[part-segmenter] cache write failed:", (e as Error).message),
+        );
+    }
+    return await resp.arrayBuffer();
+  } catch (e) {
+    if ((e as Error).name === "AbortError") {
+      throw new Error(
+        `Parts model fetch timed out after ${MODEL_FETCH_TIMEOUT_MS / 1000}s — check your network and refresh.`,
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -272,6 +309,157 @@ export interface PanelIdentification {
   frameSize?: [number, number]; // [width, height] of the source frame
 }
 
+/** Source-video rectangle to feed into the parts model (Pass 1 = whole frame, Pass 2 = zoom-in crop). */
+interface SrcRegion {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+type RawDetection = { classId: number; conf: number; bbox: Bbox };
+
+/**
+ * Run the parts-segmenter ONNX model on a specific rectangular region
+ * of the source video, then translate detections back to FULL-FRAME
+ * pixel coordinates. The 9-arg `drawImage` lets us crop+letterbox just
+ * the source region into the 640×640 ONNX input — Pass 2 uses this to
+ * give the model a higher-resolution view of the panel containing the
+ * damage when Pass 1 missed at full-frame downscale.
+ */
+async function runPartsInference(
+  videoEl: HTMLVideoElement,
+  src: SrcRegion,
+): Promise<RawDetection[]> {
+  if (!partSession || !offCtx || !f32Buf) return [];
+  if (src.w <= 0 || src.h <= 0) return [];
+
+  const scale = Math.min(INPUT_SIZE / src.w, INPUT_SIZE / src.h);
+  const nw = Math.round(src.w * scale);
+  const nh = Math.round(src.h * scale);
+  const dx = (INPUT_SIZE - nw) / 2;
+  const dy = (INPUT_SIZE - nh) / 2;
+
+  offCtx.fillStyle = YOLO_PAD_COLOR;
+  offCtx.fillRect(0, 0, INPUT_SIZE, INPUT_SIZE);
+  // 9-arg drawImage: (image, sx, sy, sw, sh, dx, dy, dw, dh)
+  offCtx.drawImage(videoEl, src.x, src.y, src.w, src.h, dx, dy, nw, nh);
+
+  const imgData = offCtx.getImageData(0, 0, INPUT_SIZE, INPUT_SIZE);
+  const px = imgData.data;
+  const total = INPUT_SIZE * INPUT_SIZE;
+
+  for (let i = 0; i < total; i++) {
+    const j = i << 2;
+    f32Buf[i] = px[j] * 0.00392156863;
+    f32Buf[total + i] = px[j + 1] * 0.00392156863;
+    f32Buf[2 * total + i] = px[j + 2] * 0.00392156863;
+  }
+
+  const tensor = new ort.Tensor("float32", f32Buf, [1, 3, INPUT_SIZE, INPUT_SIZE]);
+  const results = await partSession.run({ [partSession.inputNames[0]]: tensor });
+
+  // Post-NMS output: [1, 300, 38] — bbox(4) + conf(1) + cls(1) + mask_coefs(32)
+  const out0 = results[partSession.outputNames[0]];
+  const data = out0.data as Float32Array;
+  const numDets = out0.dims[1];
+  const rowSize = out0.dims[2];
+  const vw = videoEl.videoWidth;
+  const vh = videoEl.videoHeight;
+
+  const dets: RawDetection[] = [];
+  for (let i = 0; i < numDets; i++) {
+    const base = i * rowSize;
+    const conf = data[base + 4];
+    if (conf < CONF_THRESHOLD) continue;
+
+    const classId = Math.round(data[base + 5]);
+    // Skip the generic "object" catch-all (F-11).
+    const partKey = PART_CLASS_KEYS[classId];
+    if (partKey && SKIP_PART_KEYS.has(partKey)) continue;
+
+    // Letterbox-undo → crop-pixel coords.
+    const cx1 = (data[base + 0] - dx) / scale;
+    const cy1 = (data[base + 1] - dy) / scale;
+    const cx2 = (data[base + 2] - dx) / scale;
+    const cy2 = (data[base + 3] - dy) / scale;
+    // Translate crop coords → full-frame coords.
+    const x1 = Math.max(0, src.x + cx1);
+    const y1 = Math.max(0, src.y + cy1);
+    const x2 = Math.min(vw, src.x + cx2);
+    const y2 = Math.min(vh, src.y + cy2);
+    if (x2 <= x1 || y2 <= y1) continue;
+
+    dets.push({ classId, conf, bbox: [x1, y1, x2 - x1, y2 - y1] as Bbox });
+  }
+  return dets;
+}
+
+/**
+ * Compute the Pass-2 zoom-in source-region around the damage bbox.
+ * Square crop centered on the damage center, sized to comfortably
+ * include enough context to identify the surrounding panel. Clamped
+ * to frame edges so we never sample outside the video.
+ */
+function computeZoomCrop(damageBbox: Bbox, vw: number, vh: number): SrcRegion {
+  const [bx, by, bw, bh] = damageBbox;
+  const cx = bx + bw / 2;
+  const cy = by + bh / 2;
+  // Keep at least 800 px on each side; if the damage itself is large
+  // (>~530 px), use 1.5× its longer dimension instead so we always
+  // include a generous panel margin around it.
+  const size = Math.max(800, Math.ceil(1.5 * Math.max(bw, bh)));
+  let cropX = Math.round(cx - size / 2);
+  let cropY = Math.round(cy - size / 2);
+  let cropW = size;
+  let cropH = size;
+  if (cropX < 0) {
+    cropW += cropX;
+    cropX = 0;
+  }
+  if (cropY < 0) {
+    cropH += cropY;
+    cropY = 0;
+  }
+  if (cropX + cropW > vw) cropW = vw - cropX;
+  if (cropY + cropH > vh) cropH = vh - cropY;
+  return { x: cropX, y: cropY, w: cropW, h: cropH };
+}
+
+/**
+ * F-11 tiered fallback: score every detection, then walk a 4-tier
+ * ladder picking the first non-empty tier. Returns null only when
+ * given an empty input.
+ */
+function pickBestPanel(
+  partDets: RawDetection[],
+  damageBbox: Bbox,
+  damageClass: string | undefined,
+): (RawDetection & { overlap: number; score: number; tier: 1 | 2 | 3 | 4 }) | null {
+  if (partDets.length === 0) return null;
+
+  const scored = partDets.map((p) => {
+    const overlap = panelOverlapScore(damageBbox, p.bbox);
+    return { ...p, overlap, score: overlap * p.conf };
+  });
+  scored.sort((a, b) => b.score - a.score);
+
+  const compatibleSet = damageClass ? DAMAGE_COMPATIBLE_PANELS[damageClass] : undefined;
+  const inCompatibleSet = (p: { classId: number }) => {
+    if (!compatibleSet) return true;
+    const key = PART_CLASS_KEYS[p.classId];
+    return key !== undefined && compatibleSet.has(key);
+  };
+
+  const tier1 = scored.find((p) => inCompatibleSet(p) && p.overlap >= MIN_PANEL_OVERLAP);
+  if (tier1) return { ...tier1, tier: 1 };
+  const tier2 = scored.find((p) => p.overlap >= MIN_PANEL_OVERLAP);
+  if (tier2) return { ...tier2, tier: 2 };
+  const tier3 = scored.find((p) => inCompatibleSet(p));
+  if (tier3) return { ...tier3, tier: 3 };
+  return { ...scored[0], tier: 4 };
+}
+
 /**
  * Identify the panel at the given damage bbox. Returns the panel key
  * (e.g. "hood") or "unknown" if nothing detected, plus the panel's
@@ -280,6 +468,14 @@ export interface PanelIdentification {
  * `damageClass` (optional) restricts candidate panels to those physically
  * compatible with the damage type — e.g. `tire_flat` only matches `wheel`.
  * Omitting it falls back to the original any-panel behaviour. See F-11.
+ *
+ * Two-pass strategy:
+ *   - Pass 1: run the parts model on the whole frame.
+ *   - Pass 2 (only if Pass 1 found zero panels): re-run on a zoom-in
+ *     crop centered on the damage. Gives the model a higher-resolution
+ *     view of the surrounding panel — meaningfully improves recall on
+ *     tight camera shots without slowing down frames where Pass 1
+ *     already works.
  */
 export async function identifyPanel(
   videoEl: HTMLVideoElement,
@@ -295,112 +491,62 @@ export async function identifyPanel(
     const vh = videoEl.videoHeight;
     if (!vw || !vh) return { panel: "unknown" };
 
-    const scale = Math.min(INPUT_SIZE / vw, INPUT_SIZE / vh);
-    const nw = Math.round(vw * scale);
-    const nh = Math.round(vh * scale);
-    const dx = (INPUT_SIZE - nw) / 2;
-    const dy = (INPUT_SIZE - nh) / 2;
+    // Pass 1 — whole frame.
+    let detections = await runPartsInference(videoEl, { x: 0, y: 0, w: vw, h: vh });
+    let pass: 1 | 2 = 1;
 
-    offCtx.fillStyle = YOLO_PAD_COLOR;
-    offCtx.fillRect(0, 0, INPUT_SIZE, INPUT_SIZE);
-    offCtx.drawImage(videoEl, dx, dy, nw, nh);
-
-    const imgData = offCtx.getImageData(0, 0, INPUT_SIZE, INPUT_SIZE);
-    const px = imgData.data;
-    const total = INPUT_SIZE * INPUT_SIZE;
-
-    for (let i = 0; i < total; i++) {
-      const j = i << 2;
-      f32Buf[i] = px[j] * 0.00392156863;
-      f32Buf[total + i] = px[j + 1] * 0.00392156863;
-      f32Buf[2 * total + i] = px[j + 2] * 0.00392156863;
-    }
-
-    const tensor = new ort.Tensor("float32", f32Buf, [1, 3, INPUT_SIZE, INPUT_SIZE]);
-    const results = await partSession.run({ [partSession.inputNames[0]]: tensor });
-
-    // Post-NMS output: [1, 300, 38] — bbox(4) + conf(1) + cls(1) + mask_coefs(32)
-    const out0 = results[partSession.outputNames[0]];
-    const data = out0.data as Float32Array;
-    const numDets = out0.dims[1];
-    const rowSize = out0.dims[2];
-
-    const partDets: { classId: number; conf: number; bbox: Bbox }[] = [];
-    for (let i = 0; i < numDets; i++) {
-      const base = i * rowSize;
-      const conf = data[base + 4];
-      if (conf < CONF_THRESHOLD) continue;
-
-      const classId = Math.round(data[base + 5]);
-      // Skip the generic "object" catch-all (F-11): when the model isn't
-      // sure, it tends to pick this with low confidence and pollute the
-      // overlap-score selection.
-      const partKey = PART_CLASS_KEYS[classId];
-      if (partKey && SKIP_PART_KEYS.has(partKey)) continue;
-
-      const x1 = Math.max(0, (data[base + 0] - dx) / scale);
-      const y1 = Math.max(0, (data[base + 1] - dy) / scale);
-      const x2 = Math.min(vw, (data[base + 2] - dx) / scale);
-      const y2 = Math.min(vh, (data[base + 3] - dy) / scale);
-      if (x2 <= x1 || y2 <= y1) continue;
-
-      partDets.push({ classId, conf, bbox: [x1, y1, x2 - x1, y2 - y1] as Bbox });
-    }
-
-    if (partDets.length === 0) {
-      console.warn("[PartSeg] no part detections — returning unknown");
-      return { panel: "unknown" };
-    }
-
-    // F-11: physical-compatibility filter. For damage classes that can
-    // only land on a small set of panels (tire_flat → wheel, glass_shatter
-    // → glass, lamp_broken → lights), restrict candidates to those panels
-    // before picking the best by overlap. If the parts model didn't
-    // detect any compatible panel this frame, return "unknown" rather
-    // than fall back to an unconstrained guess — the user's panel
-    // dropdown is a better answer than e.g. "tire_flat on hood".
-    let candidates = partDets;
-    const compatibleSet = damageClass ? DAMAGE_COMPATIBLE_PANELS[damageClass] : undefined;
-    if (compatibleSet) {
-      const filtered = partDets.filter((p) => {
-        const key = PART_CLASS_KEYS[p.classId];
-        return key !== undefined && compatibleSet.has(key);
-      });
-      if (filtered.length === 0) {
-        console.warn(
-          `[PartSeg] no compatible panel for damage="${damageClass}" — returning unknown`,
-        );
-        return { panel: "unknown" };
-      }
-      candidates = filtered;
-    }
-
-    let bestPart = candidates[0];
-    let bestScore = -1;
-    let bestOverlap = 0;
-    for (const part of candidates) {
-      const overlap = panelOverlapScore(damageBbox, part.bbox);
-      const score = overlap * part.conf;
-      if (score > bestScore) {
-        bestScore = score;
-        bestOverlap = overlap;
-        bestPart = part;
-      }
-    }
-
-    // F-11: spatial-sanity floor. If the winning panel barely overlaps
-    // the damage at all, we're picking "best of bad options" — better
-    // to surface unknown and let the user override.
-    if (bestOverlap < MIN_PANEL_OVERLAP) {
+    // Pass 2 — zoom in around the damage and try again.
+    if (detections.length === 0) {
+      const crop = computeZoomCrop(damageBbox, vw, vh);
       console.warn(
-        `[PartSeg] best panel overlap ${bestOverlap.toFixed(3)} below floor ${MIN_PANEL_OVERLAP} — returning unknown`,
+        `[PartSeg] Pass 1: 0 panel detections — running Pass 2 zoom-in (crop ${crop.w}×${crop.h} at ${crop.x},${crop.y})`,
       );
+      detections = await runPartsInference(videoEl, crop);
+      pass = 2;
+      console.warn(`[PartSeg] Pass 2: ${detections.length} panel detection(s)`);
+    }
+
+    if (detections.length === 0) {
+      console.warn("[PartSeg] no panel detections after both passes — returning unknown");
       return { panel: "unknown" };
+    }
+
+    const winner = pickBestPanel(detections, damageBbox, damageClass);
+    if (!winner) return { panel: "unknown" };
+
+    // Optional debug: enable from DevTools console with
+    //   localStorage.setItem("debugPartSeg", "1")
+    if (
+      typeof window !== "undefined" &&
+      window.localStorage?.getItem("debugPartSeg") === "1"
+    ) {
+      // eslint-disable-next-line no-console
+      console.groupCollapsed(
+        `[PartSeg] pass=${pass} damage="${damageClass ?? "?"}" — ${detections.length} parts, ` +
+          `winning tier=${winner.tier}, panel="${getPartName(winner.classId)}" ` +
+          `(overlap ${winner.overlap.toFixed(3)}, conf ${winner.conf.toFixed(2)})`,
+      );
+      for (const p of detections.slice(0, 10)) {
+        const overlap = panelOverlapScore(damageBbox, p.bbox);
+        // eslint-disable-next-line no-console
+        console.log(
+          `  ${getPartName(p.classId).padEnd(18)} conf ${p.conf.toFixed(2)}  overlap ${overlap.toFixed(3)}`,
+        );
+      }
+      // eslint-disable-next-line no-console
+      console.groupEnd();
+    }
+
+    if (winner.tier > 1) {
+      console.warn(
+        `[PartSeg] tier-1 panel ID failed for damage="${damageClass ?? "?"}" (pass=${pass}) — ` +
+          `fell back to tier-${winner.tier}. Picked "${getPartName(winner.classId)}" (overlap ${winner.overlap.toFixed(3)}).`,
+      );
     }
 
     return {
-      panel: getPartName(bestPart.classId),
-      panelBbox: bestPart.bbox,
+      panel: getPartName(winner.classId),
+      panelBbox: winner.bbox,
       frameSize: [vw, vh],
     };
   } catch (err) {

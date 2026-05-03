@@ -58,20 +58,53 @@ async function purgeOldDamageCaches(currentVersion: string): Promise<void> {
   }
 }
 
-async function cachedFetch(url: string): Promise<ArrayBuffer> {
-  try {
-    const cache = await caches.open(MODEL_CACHE);
-    const cached = await cache.match(url);
-    if (cached) return cached.arrayBuffer();
+// D-6: how long to wait for the network before giving up. Without this,
+// a stalled fetch (bad WiFi, CDN outage, mis-set wasm path) would leave
+// the page on "Loading model…" indefinitely. 30 s is generous for a
+// ~12 MB ONNX file even on slow connections; users get a real error
+// surfaced via useDamageDetector if we exceed it.
+const MODEL_FETCH_TIMEOUT_MS = 30_000;
 
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
-    cache.put(url, resp.clone());
-    return resp.arrayBuffer();
-  } catch {
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
-    return resp.arrayBuffer();
+async function cachedFetch(url: string): Promise<ArrayBuffer> {
+  // Cache lookup is best-effort — failures (private mode, quota, etc.)
+  // shouldn't block the network fetch.
+  let cache: Cache | null = null;
+  if (typeof caches !== "undefined") {
+    try {
+      cache = await caches.open(MODEL_CACHE);
+      const cached = await cache.match(url);
+      if (cached) return cached.arrayBuffer();
+    } catch (e) {
+      console.warn("[detector] cache lookup failed:", (e as Error).message);
+      cache = null;
+    }
+  }
+
+  // D-6: AbortController-based timeout. Without `signal`, `fetch()` has
+  // no timeout — a stalled connection would hang the page forever.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), MODEL_FETCH_TIMEOUT_MS);
+  try {
+    const resp = await fetch(url, { signal: ctrl.signal });
+    if (!resp.ok) throw new Error(`Damage model fetch failed: ${resp.status}`);
+    if (cache) {
+      // Best-effort cache write — never let it fail the load.
+      cache
+        .put(url, resp.clone())
+        .catch((e) =>
+          console.warn("[detector] cache write failed:", (e as Error).message),
+        );
+    }
+    return await resp.arrayBuffer();
+  } catch (e) {
+    if ((e as Error).name === "AbortError") {
+      throw new Error(
+        `Damage model fetch timed out after ${MODEL_FETCH_TIMEOUT_MS / 1000}s — check your network and refresh.`,
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
