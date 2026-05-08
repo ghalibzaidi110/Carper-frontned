@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
-  LayoutDashboard, Car, ScanSearch, Users, Shield,
+  LayoutDashboard, Car, Users, Shield,
   BarChart3, Bell, UserCircle, LogOut, Menu, X, Truck, Camera, ChevronDown
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,6 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL", "ADMIN"] },
-  { label: "Damage Detection", path: "/dashboard/detection", icon: <ScanSearch size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL"] },
   { label: "Live Detection", path: "/dashboard/live-detection", icon: <Camera size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL"] },
   { label: "Rentals", path: "/dashboard/rentals", icon: <Truck size={20} />, roles: ["CAR_RENTAL"] },
   { label: "Users", path: "/admin/users", icon: <Users size={20} />, roles: ["ADMIN"] },
