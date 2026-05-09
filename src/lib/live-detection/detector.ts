@@ -1,13 +1,25 @@
-import * as ort from "onnxruntime-web";
+import type * as OrtTypes from "onnxruntime-web";
 
 import { CLASS_NAMES, classMinConfidence, classNmsIou } from "./classes";
 import type { Bbox } from "./iou";
 import { iou, YOLO_PAD_COLOR } from "./iou";
 import type { Detection } from "./tracks";
 
-// Match the version installed locally (see package.json -> onnxruntime-web)
-ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/";
-ort.env.wasm.numThreads = 1;
+/**
+ * Lazy-loaded ONNX Runtime module. Importing onnxruntime-web at the top
+ * level would pull ~2 MB of WASM loader into the page bundle even for
+ * users who never visit /live-detection. Instead we dynamic-import it
+ * on first model load and cache the module reference.
+ */
+let ort: typeof OrtTypes | null = null;
+
+async function ensureOrt(): Promise<typeof OrtTypes> {
+  if (ort) return ort;
+  ort = await import("onnxruntime-web");
+  ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/";
+  ort.env.wasm.numThreads = 1;
+  return ort;
+}
 
 /**
  * Damage-detection model version. Bumping this triggers a fresh download
@@ -20,7 +32,7 @@ const MODEL_CACHE = `carper-damage-model-${DAMAGE_MODEL_VERSION}`;
 const INPUT_SIZE = 640;
 const TOTAL_PX = INPUT_SIZE * INPUT_SIZE;
 
-let session: ort.InferenceSession | null = null;
+let session: OrtTypes.InferenceSession | null = null;
 let f32Buffer: Float32Array | null = null;
 let offscreen: OffscreenCanvas | null = null;
 let offCtx: OffscreenCanvasRenderingContext2D | null = null;
@@ -76,14 +88,14 @@ async function cachedFetch(url: string): Promise<ArrayBuffer> {
 }
 
 /** Load YOLOv8n damage-detection model (cached after first download). */
-export async function loadDamageModel(url: string = MODEL_URL): Promise<ort.InferenceSession> {
+export async function loadDamageModel(url: string = MODEL_URL): Promise<OrtTypes.InferenceSession> {
   if (session) return session;
+  const ortMod = await ensureOrt();
   // F-1: clean up cache entries for older model versions before we open
   // ours. Cheap (one Cache API listing) and runs only on first load.
   await purgeOldDamageCaches(DAMAGE_MODEL_VERSION);
   // One-time visibility into active config (F-8, F-9, F-10 verification).
   // Logs only on the first load; subsequent calls return the cached session.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { CLASS_CONF_THRESHOLDS, CLASS_NMS_IOU } = await import("./classes");
   console.log(
     "[live-detection] Active config:",
@@ -95,7 +107,7 @@ export async function loadDamageModel(url: string = MODEL_URL): Promise<ort.Infe
     },
   );
   const buf = await cachedFetch(url);
-  session = await ort.InferenceSession.create(buf, {
+  session = await ortMod.InferenceSession.create(buf, {
     executionProviders: ["wasm"],
     graphOptimizationLevel: "all",
   });
@@ -168,8 +180,9 @@ export async function detectDamage(
     f32Buffer[2 * TOTAL_PX + i] = px[j + 2] * 0.00392156863;
   }
 
-  const tensor = new ort.Tensor("float32", f32Buffer, [1, 3, INPUT_SIZE, INPUT_SIZE]);
-  const feeds: Record<string, ort.Tensor> = { [session.inputNames[0]]: tensor };
+  const ortMod = await ensureOrt();
+  const tensor = new ortMod.Tensor("float32", f32Buffer, [1, 3, INPUT_SIZE, INPUT_SIZE]);
+  const feeds: Record<string, OrtTypes.Tensor> = { [session.inputNames[0]]: tensor };
 
   const results = await session.run(feeds);
   const output = results[session.outputNames[0]];

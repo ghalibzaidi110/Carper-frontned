@@ -1,13 +1,15 @@
 "use client";
 
-import { Camera, CircleDot, Loader2, Play, Square } from "lucide-react";
+import { Camera, CircleDot, Loader2, Play, Square, View } from "lucide-react";
 
 import type { CameraStatus } from "../hooks/useCamera";
 import type { ModelStatus } from "../hooks/useDamageDetector";
+import type { XRStatus } from "../hooks/useWebXRDepth";
 
 interface CameraViewportProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  xrCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   cameraStatus: CameraStatus;
   modelStatus: ModelStatus;
   fps: number;
@@ -16,11 +18,17 @@ interface CameraViewportProps {
   onStart: () => void;
   onStop: () => void;
   onCapture: () => void;
+  xrAvailable: boolean;
+  xrStatus: XRStatus;
+  xrError: string | null;
+  onStartAR: () => void;
+  onStopAR: () => void;
 }
 
 export function CameraViewport({
   videoRef,
   canvasRef,
+  xrCanvasRef,
   cameraStatus,
   modelStatus,
   fps,
@@ -29,9 +37,15 @@ export function CameraViewport({
   onStart,
   onStop,
   onCapture,
+  xrAvailable,
+  xrStatus,
+  xrError,
+  onStartAR,
+  onStopAR,
 }: CameraViewportProps) {
-  const isActive = cameraStatus === "active";
-  const isStarting = cameraStatus === "starting";
+  const xrActive = xrStatus === "active";
+  const isActive = cameraStatus === "active" || xrActive;
+  const isStarting = cameraStatus === "starting" || xrStatus === "starting";
   const modelLoading = modelStatus === "loading";
   const modelReady = modelStatus === "ready";
 
@@ -86,12 +100,24 @@ export function CameraViewport({
           autoPlay
           playsInline
           muted
-          className="absolute inset-0 w-full h-full object-contain"
+          className={`absolute inset-0 w-full h-full object-contain ${xrActive ? "hidden" : ""}`}
+        />
+        {/* XR canvas — shown when AR mode active, hidden otherwise */}
+        <canvas
+          ref={xrCanvasRef as React.RefObject<HTMLCanvasElement>}
+          className={`absolute inset-0 w-full h-full object-contain ${xrActive ? "" : "hidden"}`}
         />
         <canvas
           ref={canvasRef as React.RefObject<HTMLCanvasElement>}
           className="absolute inset-0 w-full h-full object-contain pointer-events-none"
         />
+        {/* AR mode badge */}
+        {xrActive && (
+          <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-emerald-500/80 text-white text-xs font-semibold flex items-center gap-1">
+            <View size={12} />
+            AR Depth
+          </div>
+        )}
         {!isActive && (
           <div className="absolute inset-0 flex items-center justify-center text-center">
             <div>
@@ -145,6 +171,35 @@ export function CameraViewport({
           <CircleDot size={16} />
           Capture frame
         </button>
+        {xrAvailable && (
+          xrActive ? (
+            <button
+              type="button"
+              onClick={onStopAR}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors ml-auto"
+            >
+              <View size={16} />
+              Exit AR
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onStartAR}
+              disabled={!modelReady || isStarting}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-500/50 text-emerald-700 dark:text-emerald-400 text-sm font-medium hover:bg-emerald-500/10 disabled:opacity-50 disabled:cursor-not-allowed transition-colors ml-auto"
+            >
+              {xrStatus === "starting" ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <View size={16} />
+              )}
+              AR Measure
+            </button>
+          )
+        )}
+        {xrError && (
+          <span className="text-xs text-destructive">{xrError}</span>
+        )}
       </div>
     </div>
   );

@@ -7,8 +7,12 @@ import { drawDetections, clearOverlay } from "@/lib/live-detection/renderer";
 import { MIN_HITS, updateTracks } from "@/lib/live-detection/tracks";
 import type { Detection, Track } from "@/lib/live-detection/tracks";
 
+/** Detection source — video for normal mode, canvas for WebXR AR mode. */
+type SourceElement = HTMLVideoElement | HTMLCanvasElement;
+
 interface UseDetectionLoopArgs {
-  videoRef: React.RefObject<HTMLVideoElement | null>;
+  /** Primary detection source (video or XR canvas). */
+  sourceRef: React.RefObject<SourceElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   active: boolean;
   threshold: number;
@@ -26,7 +30,7 @@ interface UseDetectionLoopReturn {
  * and exposes the current visible detections + an FPS readout.
  */
 export function useDetectionLoop({
-  videoRef,
+  sourceRef,
   canvasRef,
   active,
   threshold,
@@ -59,25 +63,31 @@ export function useDetectionLoop({
 
     const loop = async () => {
       if (cancelled) return;
-      const video = videoRef.current;
+      const source = sourceRef.current;
       const canvas = canvasRef.current;
-      if (!video || !canvas) {
+      if (!source || !canvas) {
         rafRef.current = requestAnimationFrame(loop);
         return;
       }
-      // Match canvas to video size (only when changed to avoid layout thrash)
-      if (video.videoWidth && video.videoHeight) {
-        if (canvas.width !== video.videoWidth) canvas.width = video.videoWidth;
-        if (canvas.height !== video.videoHeight) canvas.height = video.videoHeight;
+
+      // Source dimensions — video uses videoWidth/videoHeight, canvas uses width/height
+      const isVideo = source instanceof HTMLVideoElement;
+      const srcW = isVideo ? source.videoWidth : source.width;
+      const srcH = isVideo ? source.videoHeight : source.height;
+
+      // Match overlay canvas to source size (only when changed to avoid layout thrash)
+      if (srcW && srcH) {
+        if (canvas.width !== srcW) canvas.width = srcW;
+        if (canvas.height !== srcH) canvas.height = srcH;
       }
 
       try {
-        if (!isDamageModelLoaded() || video.readyState < 2) {
+        if (!isDamageModelLoaded() || (isVideo && source.readyState < 2)) {
           rafRef.current = requestAnimationFrame(loop);
           return;
         }
 
-        const dets = await detectDamage(video, thresholdRef.current);
+        const dets = await detectDamage(source, thresholdRef.current);
         if (cancelled) return;
 
         const now = performance.now();
@@ -89,7 +99,18 @@ export function useDetectionLoop({
           .slice(0, 25);
 
         const ctx = canvas.getContext("2d");
-        if (ctx) drawDetections(ctx, canvas, video, visible);
+        // drawDetections expects HTMLVideoElement for sizing — when source is
+        // canvas (XR mode), create a minimal shim with matching dimensions.
+        if (ctx) {
+          if (isVideo) {
+            drawDetections(ctx, canvas, source, visible);
+          } else {
+            // XR canvas mode: drawDetections uses videoWidth/videoHeight for
+            // coordinate mapping. Create a duck-typed shim.
+            const shim = { videoWidth: srcW, videoHeight: srcH } as HTMLVideoElement;
+            drawDetections(ctx, canvas, shim, visible);
+          }
+        }
 
         setDetections(visible.map((t) => ({ ...t, bbox: t.smoothBbox })));
 
@@ -123,7 +144,7 @@ export function useDetectionLoop({
       setDetections([]);
       setFps(0);
     };
-  }, [active, modelReady, videoRef, canvasRef]);
+  }, [active, modelReady, sourceRef, canvasRef]);
 
   return { detections, fps };
 }

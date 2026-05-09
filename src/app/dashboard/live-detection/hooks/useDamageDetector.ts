@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { pruneOldCaptures } from "@/lib/live-detection/capture-store";
+import { releaseDepthModel } from "@/lib/live-detection/depth-estimator";
 import { loadDamageModel, releaseDamageModel } from "@/lib/live-detection/detector";
 import { preloadPartModel, releasePartModel } from "@/lib/live-detection/part-segmenter";
 import { diffAgainstCanonical } from "@/lib/live-detection/vehicle";
@@ -83,6 +84,7 @@ export function useDamageDetector(): UseDamageDetector {
       // is essentially free in user-perceived latency.
       void releaseDamageModel();
       void releasePartModel();
+      void releaseDepthModel();
       // Allow the next mount to start fresh (otherwise startedRef.current
       // stays true and the effect skips re-loading).
       startedRef.current = false;

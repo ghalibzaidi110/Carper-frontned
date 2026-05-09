@@ -9,10 +9,24 @@
  * for panel-location identification.
  */
 
-import * as ort from "onnxruntime-web";
+import type * as OrtTypes from "onnxruntime-web";
 
 import type { Bbox } from "./iou";
 import { panelOverlapScore, YOLO_PAD_COLOR } from "./iou";
+
+/**
+ * Lazy-loaded ONNX Runtime — shared with detector.ts. If the detector
+ * already loaded it, this resolves instantly from the module cache.
+ */
+let ort: typeof OrtTypes | null = null;
+
+async function ensureOrt(): Promise<typeof OrtTypes> {
+  if (ort) return ort;
+  ort = await import("onnxruntime-web");
+  ort.env.wasm.wasmPaths = "https://cdn.jsdelivr.net/npm/onnxruntime-web@1.24.3/dist/";
+  ort.env.wasm.numThreads = 1;
+  return ort;
+}
 
 /**
  * Parts-segmentation model version. See detector.ts:DAMAGE_MODEL_VERSION
@@ -147,7 +161,7 @@ export function getPanelOptions(): PanelOption[] {
   return PART_CLASS_KEYS.map((k) => ({ key: k, label: PART_DISPLAY[k] ?? k }));
 }
 
-let partSession: ort.InferenceSession | null = null;
+let partSession: OrtTypes.InferenceSession | null = null;
 let f32Buf: Float32Array | null = null;
 let offscreen: OffscreenCanvas | null = null;
 let offCtx: OffscreenCanvasRenderingContext2D | null = null;
@@ -207,11 +221,12 @@ async function ensureModel(): Promise<void> {
   if (partSession) return;
   if (!loadingPromise) {
     loadingPromise = (async () => {
+      const ortMod = await ensureOrt();
       // F-1: clean up cache entries for older parts-model versions before
       // we open ours.
       await purgeOldPartCaches(PARTS_MODEL_VERSION);
       const buf = await cachedFetch(MODEL_URL);
-      partSession = await ort.InferenceSession.create(buf, {
+      partSession = await ortMod.InferenceSession.create(buf, {
         executionProviders: ["wasm"],
         graphOptimizationLevel: "all",
       });
@@ -316,7 +331,8 @@ export async function identifyPanel(
       f32Buf[2 * total + i] = px[j + 2] * 0.00392156863;
     }
 
-    const tensor = new ort.Tensor("float32", f32Buf, [1, 3, INPUT_SIZE, INPUT_SIZE]);
+    const ortMod = await ensureOrt();
+    const tensor = new ortMod.Tensor("float32", f32Buf, [1, 3, INPUT_SIZE, INPUT_SIZE]);
     const results = await partSession.run({ [partSession.inputNames[0]]: tensor });
 
     // Post-NMS output: [1, 300, 38] — bbox(4) + conf(1) + cls(1) + mask_coefs(32)

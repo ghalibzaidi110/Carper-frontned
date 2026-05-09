@@ -2,8 +2,9 @@
 
 import { DollarSign, FileText, Loader2, Trash2 } from "lucide-react";
 
+import { Skeleton } from "@/components/ui/skeleton";
 import { displayName, getColor } from "@/lib/live-detection/classes";
-import { PART_DISPLAY, type PartKey } from "@/lib/live-detection/part-segmenter";
+import { getPanelOptions, PART_DISPLAY } from "@/lib/live-detection/part-segmenter";
 
 import type { LogEntry } from "../hooks/useDamageLog";
 
@@ -13,6 +14,7 @@ interface DamageLogProps {
   onClear: () => void;
   onEstimate: (id: number) => void;
   onEstimateAll: () => void;
+  onSetPanel: (id: number, panel: string) => void;
   estimateAllLoading: boolean;
 }
 
@@ -21,12 +23,15 @@ function panelLabel(panel: string | null): string {
   return (PART_DISPLAY as Record<string, string>)[panel] ?? panel;
 }
 
+const PANEL_OPTIONS = getPanelOptions().filter((p) => p.key !== "object");
+
 export function DamageLog({
   entries,
   onDelete,
   onClear,
   onEstimate,
   onEstimateAll,
+  onSetPanel,
   estimateAllLoading,
 }: DamageLogProps) {
   return (
@@ -78,21 +83,47 @@ export function DamageLog({
                   </button>
                 </div>
                 <div className="flex items-center justify-between text-xs text-muted-foreground gap-2">
-                  <span className="truncate">Panel: {panelLabel(e.panelLocation)}</span>
-                  {cost !== undefined && (
-                    <span className="font-mono tabular-nums text-foreground/90">
-                      ≈ {cost.toLocaleString()} PKR
-                    </span>
-                  )}
-                  {cost === undefined && vendorMin !== undefined && (
-                    <span className="font-mono tabular-nums text-foreground/90">
-                      from {vendorMin.toLocaleString()} PKR
-                    </span>
-                  )}
-                  {cost === undefined && vendorMin === undefined && fallback && (
-                    <span className="font-mono tabular-nums text-foreground/90">
-                      {fallback.min.toLocaleString()}–{fallback.max.toLocaleString()} PKR
-                    </span>
+                  <span className="truncate flex items-center gap-1">
+                    Panel:{" "}
+                    {e.panelLocation === null ? (
+                      <><Loader2 size={10} className="animate-spin inline" /> Identifying…</>
+                    ) : e.panelLocation === "unknown" ? (
+                      <select
+                        className="text-xs bg-muted border border-border rounded px-1 py-0.5 text-foreground"
+                        defaultValue=""
+                        onChange={(ev) => {
+                          if (ev.target.value) onSetPanel(e.id, ev.target.value);
+                        }}
+                      >
+                        <option value="" disabled>Select panel…</option>
+                        {PANEL_OPTIONS.map((p) => (
+                          <option key={p.key} value={p.key}>{p.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      panelLabel(e.panelLocation)
+                    )}
+                  </span>
+                  {e.estimateLoading ? (
+                    <Skeleton className="h-3.5 w-24" />
+                  ) : (
+                    <>
+                      {cost !== undefined && (
+                        <span className="font-mono tabular-nums text-foreground/90">
+                          ≈ {cost.toLocaleString()} PKR
+                        </span>
+                      )}
+                      {cost === undefined && vendorMin !== undefined && (
+                        <span className="font-mono tabular-nums text-foreground/90">
+                          from {vendorMin.toLocaleString()} PKR
+                        </span>
+                      )}
+                      {cost === undefined && vendorMin === undefined && fallback && (
+                        <span className="font-mono tabular-nums text-foreground/90">
+                          {fallback.min.toLocaleString()}–{fallback.max.toLocaleString()} PKR
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
                 <button
@@ -145,5 +176,3 @@ export function DamageLog({
   );
 }
 
-// Suppress unused-var for PartKey on production builds where the import was helpful for typing.
-export type _Ignored = PartKey;
