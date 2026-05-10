@@ -7,7 +7,6 @@ import { DEFAULT_VEHICLE, type Vehicle } from "@/lib/live-detection/vehicle";
 import type { Detection } from "@/lib/live-detection/tracks";
 
 import { CameraViewport } from "./components/CameraViewport";
-import { ConfidenceSlider } from "./components/ConfidenceSlider";
 import { DamageLog } from "./components/DamageLog";
 import { DetectionsList } from "./components/DetectionsList";
 import { EstimateDialog } from "./components/EstimateDialog";
@@ -23,8 +22,9 @@ import { useDetectionLoop } from "./hooks/useDetectionLoop";
 import { useSecureContext } from "./hooks/useSecureContext";
 import { useWebXRDepth } from "./hooks/useWebXRDepth";
 
+const DETECTION_THRESHOLD = 0.4;
+
 export default function LiveDetectionPage() {
-  const [threshold, setThreshold] = useState(0.4);
   const [vehicle, setVehicle] = useState<Vehicle>(DEFAULT_VEHICLE);
   const [openEstimate, setOpenEstimate] = useState<LogEntry | null>(null);
   const [openVendors, setOpenVendors] = useState<LogEntry | null>(null);
@@ -54,7 +54,7 @@ export default function LiveDetectionPage() {
     sourceRef,
     canvasRef,
     active: xr.xrStatus === "active" || camera.status === "active",
-    threshold,
+    threshold: DETECTION_THRESHOLD,
     modelReady: detector.status === "ready",
   });
   const log = useDamageLog({
@@ -201,7 +201,6 @@ export default function LiveDetectionPage() {
 
           <aside className="space-y-4">
             <VehicleSelect value={vehicle} onChange={setVehicle} />
-            <ConfidenceSlider value={threshold} onChange={setThreshold} />
             <DetectionsList detections={detections} onLog={handleAddDetection} />
             <DamageLog
               entries={log.entries}

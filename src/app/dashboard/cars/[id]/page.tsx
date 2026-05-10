@@ -412,12 +412,6 @@ export default function CarDetailPage() {
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-display font-semibold text-foreground">Damage Detection</h2>
-                <Link
-                  href="/dashboard/detection"
-                  className="text-sm text-primary hover:underline"
-                >
-                  Go to Detection Page →
-                </Link>
               </div>
               {damageList.length === 0 ? (
                 <div className="text-center py-12">
