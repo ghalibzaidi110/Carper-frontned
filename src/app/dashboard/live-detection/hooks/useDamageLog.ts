@@ -184,11 +184,14 @@ export function useDamageLog({ videoRef, estimateDepth, xrActive, measureDamageX
             );
           });
 
-        // Async: capture cropped frame -> IndexedDB
+        // Async: capture cropped frame -> IndexedDB. We pass `entryId`
+        // through so the Save-scan flow can later look up this capture
+        // by entry without scanning the whole store.
         captureRegion(video, det.bbox)
           .then((dataUrl) => {
             if (!dataUrl) return;
             return saveCapture({
+              entryId: id,
               className: det.className,
               classId: det.classId,
               confidence: det.confidence,
