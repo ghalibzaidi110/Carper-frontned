@@ -21,9 +21,14 @@ export default function LandingPage() {
         {/* Floating navbar */}
         <nav className="relative z-20 px-6 lg:px-10 py-5 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center shadow-[0_0_24px_-4px_hsl(195_100%_50%/0.7)]">
-              <Car size={18} className="text-primary-foreground" />
-            </div>
+            <Image
+              src="/mainlogo.png"
+              alt="Carper logo"
+              width={56}
+              height={56}
+              priority
+              className="h-14 w-14 rounded-lg shadow-[0_0_24px_-4px_hsl(195_100%_50%/0.7)] object-contain"
+            />
             <span className="font-display font-bold text-lg tracking-tight">Carper</span>
           </Link>
           <div className="flex items-center gap-3">

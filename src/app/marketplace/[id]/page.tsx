@@ -121,9 +121,11 @@ export default function MarketplaceDetailPage() {
       <nav className="sticky top-0 z-50 glass border-b border-border/50">
         <div className="container mx-auto flex items-center justify-between h-16 px-4">
           <Link href="/" className="flex items-center gap-2">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center">
-              <Car size={20} className="text-primary-foreground" />
-            </div>
+            <img
+              src="/mainlogo.png"
+              alt="Carper logo"
+              className="h-12 w-12 rounded-lg object-contain"
+            />
             <span className="font-display font-bold text-xl text-foreground">Carper</span>
           </Link>
           <Link
