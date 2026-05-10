@@ -17,6 +17,8 @@ interface UseDetectionLoopArgs {
   active: boolean;
   threshold: number;
   modelReady: boolean;
+  /** Throttle inference to at most once per this many ms (default: no throttle). */
+  minIntervalMs?: number;
 }
 
 interface UseDetectionLoopReturn {
@@ -35,6 +37,7 @@ export function useDetectionLoop({
   active,
   threshold,
   modelReady,
+  minIntervalMs = 0,
 }: UseDetectionLoopArgs): UseDetectionLoopReturn {
   const [detections, setDetections] = useState<Detection[]>([]);
   const [fps, setFps] = useState(0);
@@ -43,6 +46,8 @@ export function useDetectionLoop({
   const fpsTimesRef = useRef<number[]>([]);
   const rafRef = useRef<number | null>(null);
   const thresholdRef = useRef(threshold);
+  const lastInferRef = useRef(0);
+  const lastFpsUpdateRef = useRef(0);
 
   // Keep threshold ref in sync without restarting the loop
   useEffect(() => {
@@ -87,10 +92,18 @@ export function useDetectionLoop({
           return;
         }
 
+        const now = performance.now();
+
+        // Throttle inference when minIntervalMs is set (e.g. AR mode)
+        if (minIntervalMs > 0 && now - lastInferRef.current < minIntervalMs) {
+          rafRef.current = requestAnimationFrame(loop);
+          return;
+        }
+        lastInferRef.current = now;
+
         const dets = await detectDamage(source, thresholdRef.current);
         if (cancelled) return;
 
-        const now = performance.now();
         tracksRef.current = updateTracks(tracksRef.current, dets, now);
 
         const visible = tracksRef.current
@@ -114,11 +127,14 @@ export function useDetectionLoop({
 
         setDetections(visible.map((t) => ({ ...t, bbox: t.smoothBbox })));
 
-        // FPS — sliding 1000ms window
+        // FPS — sliding 1000ms window, update state at most every 500ms
         const times = fpsTimesRef.current;
         times.push(now);
         while (times.length > 0 && now - times[0] > 1000) times.shift();
-        setFps(times.length);
+        if (now - lastFpsUpdateRef.current >= 500) {
+          lastFpsUpdateRef.current = now;
+          setFps(times.length);
+        }
       } catch (err) {
         // Keep the loop alive on transient errors
         console.error("[useDetectionLoop] error:", err);
@@ -137,6 +153,8 @@ export function useDetectionLoop({
       }
       tracksRef.current = [];
       fpsTimesRef.current = [];
+      lastInferRef.current = 0;
+      lastFpsUpdateRef.current = 0;
       if (canvasRef.current) {
         const ctx = canvasRef.current.getContext("2d");
         if (ctx) clearOverlay(ctx, canvasRef.current);
@@ -144,7 +162,7 @@ export function useDetectionLoop({
       setDetections([]);
       setFps(0);
     };
-  }, [active, modelReady, sourceRef, canvasRef]);
+  }, [active, modelReady, sourceRef, canvasRef, minIntervalMs]);
 
   return { detections, fps };
 }

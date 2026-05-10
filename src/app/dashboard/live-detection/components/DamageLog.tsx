@@ -103,6 +103,9 @@ export function DamageLog({
                     ) : (
                       panelLabel(e.panelLocation)
                     )}
+                    {e.estimate?.breakdown?.areaCm2 != null && (
+                      <span className="ml-1 text-foreground/70">· {e.estimate.breakdown.areaCm2.toFixed(1)} cm²</span>
+                    )}
                   </span>
                   {e.estimateLoading ? (
                     <Skeleton className="h-3.5 w-24" />

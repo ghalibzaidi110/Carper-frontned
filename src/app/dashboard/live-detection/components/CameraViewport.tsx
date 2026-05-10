@@ -112,19 +112,34 @@ export function CameraViewport({
           muted
           className={`absolute inset-0 w-full h-full object-contain ${xrActive ? "hidden" : ""}`}
         />
-        {/* XR canvas — shown when AR mode active, hidden otherwise */}
+        {/* XR canvas — always in DOM so the WebGL context (and XR session
+            binding) stays stable. When AR is active we fix it to the
+            viewport so it actually fills the screen; `fixed` children
+            escape the parent's overflow-hidden. When inactive it is
+            hidden so it doesn't occlude the video feed. */}
         <canvas
           ref={xrCanvasRef as React.RefObject<HTMLCanvasElement>}
-          className={`absolute inset-0 w-full h-full object-contain ${xrActive ? "" : "hidden"}`}
+          className={
+            xrActive
+              ? "fixed inset-0 z-40 w-full h-full"
+              : "absolute inset-0 w-full h-full hidden"
+          }
         />
         {/* Depth heatmap overlay — below detection boxes so bboxes stay visible */}
         <canvas
           ref={depthCanvasRef as React.RefObject<HTMLCanvasElement>}
           className={`absolute inset-0 w-full h-full object-contain pointer-events-none ${depthOverlayActive ? "" : "hidden"}`}
         />
+        {/* Detection bbox overlay — also goes fullscreen during AR so bboxes
+            are drawn over the XR passthrough view. z-41 sits above XR canvas
+            (z-40) but below the controls overlay (z-50). */}
         <canvas
           ref={canvasRef as React.RefObject<HTMLCanvasElement>}
-          className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+          className={
+            xrActive
+              ? "fixed inset-0 z-[41] w-full h-full pointer-events-none"
+              : "absolute inset-0 w-full h-full object-contain pointer-events-none"
+          }
         />
         {/* Depth overlay badge */}
         {depthOverlayActive && (
@@ -133,11 +148,11 @@ export function CameraViewport({
             Depth View
           </div>
         )}
-        {/* AR mode badge */}
+        {/* AR active — viewport shows camera feed placeholder; real AR view is
+            the fullscreen overlay rendered by the page. */}
         {xrActive && (
-          <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-emerald-500/80 text-white text-xs font-semibold flex items-center gap-1">
-            <View size={12} />
-            AR Depth
+          <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+            <p className="text-white/70 text-sm">AR session active</p>
           </div>
         )}
         {!isActive && (
