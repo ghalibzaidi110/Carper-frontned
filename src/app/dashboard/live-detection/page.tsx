@@ -18,6 +18,7 @@ import { useCamera } from "./hooks/useCamera";
 import { useDamageDetector } from "./hooks/useDamageDetector";
 import { useDepthEstimator } from "./hooks/useDepthEstimator";
 import { type LogEntry, REPAIR_TYPES, useDamageLog } from "./hooks/useDamageLog";
+import { useDepthOverlay } from "./hooks/useDepthOverlay";
 import { useDetectionLoop } from "./hooks/useDetectionLoop";
 import { useSecureContext } from "./hooks/useSecureContext";
 import { useWebXRDepth } from "./hooks/useWebXRDepth";
@@ -32,6 +33,7 @@ export default function LiveDetectionPage() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const xrCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const depthCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const secureContext = useSecureContext();
   const detector = useDamageDetector();
@@ -41,6 +43,12 @@ export default function LiveDetectionPage() {
 
   // Detection source: XR canvas when AR active, video otherwise
   const sourceRef = xr.xrStatus === "active" ? xrCanvasRef : camera.videoRef;
+
+  const depthOverlay = useDepthOverlay({
+    sourceRef,
+    depthCanvasRef,
+    cameraActive: xr.xrStatus === "active" || camera.status === "active",
+  });
 
   const { detections, fps } = useDetectionLoop({
     sourceRef,
@@ -171,6 +179,7 @@ export default function LiveDetectionPage() {
             videoRef={camera.videoRef}
             canvasRef={canvasRef}
             xrCanvasRef={xrCanvasRef}
+            depthCanvasRef={depthCanvasRef}
             cameraStatus={camera.status}
             modelStatus={detector.status}
             fps={fps}
@@ -184,6 +193,10 @@ export default function LiveDetectionPage() {
             xrError={xr.xrError}
             onStartAR={handleStartAR}
             onStopAR={handleStopAR}
+            depthOverlayActive={depthOverlay.depthOverlayActive}
+            depthOverlayLoading={depthOverlay.depthOverlayLoading}
+            depthDownloadPct={depthOverlay.depthDownloadPct}
+            onToggleDepth={depthOverlay.toggleDepthOverlay}
           />
 
           <aside className="space-y-4">

@@ -139,10 +139,28 @@ export function useDamageLog({ videoRef, estimateDepth, xrActive, measureDamageX
       // a `tire_flat` is only allowed to match a `wheel`.
       const video = videoRef.current;
       if (video) {
+        // Retry panel identification up to 3 times across different frames.
+        // The parts model has weak confidence on single frames (motion blur,
+        // angle), so sampling multiple frames increases the chance of a
+        // successful identification.
+        const MAX_PANEL_RETRIES = 3;
+        const PANEL_RETRY_DELAY_MS = 500;
         const panelTimeout = new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("panel identification timed out")), 5000),
+          setTimeout(() => reject(new Error("panel identification timed out")), 8000),
         );
-        Promise.race([identifyPanel(video, det.bbox, det.className), panelTimeout])
+        const attemptPanelId = async () => {
+          for (let attempt = 0; attempt < MAX_PANEL_RETRIES; attempt++) {
+            const v = videoRef.current;
+            if (!v || v.readyState < 2) break;
+            const result = await identifyPanel(v, det.bbox, det.className);
+            if (result.panel !== "unknown") return result;
+            if (attempt < MAX_PANEL_RETRIES - 1) {
+              await new Promise((r) => setTimeout(r, PANEL_RETRY_DELAY_MS));
+            }
+          }
+          return { panel: "unknown" as string };
+        };
+        Promise.race([attemptPanelId(), panelTimeout])
           .then((result) => {
             setEntries((prev) =>
               prev.map((e) =>
@@ -150,8 +168,8 @@ export function useDamageLog({ videoRef, estimateDepth, xrActive, measureDamageX
                   ? {
                       ...e,
                       panelLocation: result.panel,
-                      panelBbox: result.panelBbox ?? null,
-                      frameSize: result.frameSize ?? null,
+                      panelBbox: ("panelBbox" in result ? result.panelBbox : undefined) ?? null,
+                      frameSize: ("frameSize" in result ? result.frameSize : undefined) ?? null,
                     }
                   : e,
               ),

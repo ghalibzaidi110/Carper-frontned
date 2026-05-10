@@ -30,7 +30,7 @@ async function ensureOrt(): Promise<typeof OrtTypes> {
 // ── Model config ────────────────────────────────────────────────────
 
 export const DEPTH_MODEL_VERSION = "v1";
-const MODEL_URL = `/models/depth-anything-v2-small.${DEPTH_MODEL_VERSION}.onnx`;
+const MODEL_URL = `/models/model_fp16.onnx`;
 const MODEL_CACHE = `carper-depth-model-${DEPTH_MODEL_VERSION}`;
 const INPUT_SIZE = 518; // Depth-Anything-V2-Small native input
 const TOTAL_PX = INPUT_SIZE * INPUT_SIZE;
@@ -40,6 +40,7 @@ const MEAN = [0.485, 0.456, 0.406] as const;
 const STD = [0.229, 0.224, 0.225] as const;
 
 let session: OrtTypes.InferenceSession | null = null;
+let loadPromise: Promise<OrtTypes.InferenceSession> | null = null;
 let f32Buffer: Float32Array | null = null;
 let offscreen: OffscreenCanvas | null = null;
 let offCtx: OffscreenCanvasRenderingContext2D | null = null;
@@ -73,41 +74,90 @@ async function purgeOldDepthCaches(currentVersion: string): Promise<void> {
   }
 }
 
-async function cachedFetch(url: string): Promise<ArrayBuffer> {
-  try {
-    const cache = await caches.open(MODEL_CACHE);
-    const cached = await cache.match(url);
-    if (cached) return cached.arrayBuffer();
+async function fetchWithProgress(
+  url: string,
+  onProgress?: (pct: number) => void,
+): Promise<ArrayBuffer> {
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
 
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
-    cache.put(url, resp.clone());
-    return resp.arrayBuffer();
-  } catch {
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
-    return resp.arrayBuffer();
+  const total = Number(resp.headers.get("content-length") ?? 0);
+  if (!total || !onProgress || !resp.body) return resp.arrayBuffer();
+
+  const reader = resp.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.byteLength;
+    onProgress(Math.min(99, Math.round((received / total) * 100)));
   }
+
+  onProgress(100);
+  const out = new Uint8Array(received);
+  let pos = 0;
+  for (const chunk of chunks) { out.set(chunk, pos); pos += chunk.byteLength; }
+  return out.buffer;
+}
+
+async function cachedFetch(
+  url: string,
+  onProgress?: (pct: number) => void,
+): Promise<ArrayBuffer> {
+  if (typeof caches !== "undefined") {
+    const cache = await caches.open(MODEL_CACHE);
+    const hit = await cache.match(url);
+    if (hit) return hit.arrayBuffer();
+
+    const buf = await fetchWithProgress(url, onProgress);
+    await cache.put(url, new Response(buf.slice(0), {
+      headers: { "content-type": "application/octet-stream" },
+    }));
+    return buf;
+  }
+  return fetchWithProgress(url, onProgress);
 }
 
 // ── Model lifecycle ─────────────────────────────────────────────────
 
-/** Load Depth-Anything-V2-Small model (~50 MB, cached after first download). */
-export async function loadDepthModel(url: string = MODEL_URL): Promise<OrtTypes.InferenceSession> {
-  if (session) return session;
-  const ortMod = await ensureOrt();
-  await purgeOldDepthCaches(DEPTH_MODEL_VERSION);
-  // eslint-disable-next-line no-console
-  console.log("[depth-estimator] Loading Depth-Anything-V2-Small...");
-  const buf = await cachedFetch(url);
-  session = await ortMod.InferenceSession.create(buf, {
-    executionProviders: ["wasm"],
-    graphOptimizationLevel: "all",
-  });
-  ensureBuffers();
-  // eslint-disable-next-line no-console
-  console.log("[depth-estimator] Model loaded. Input:", session.inputNames, "Output:", session.outputNames);
-  return session;
+/** Load Depth-Anything-V2-Small model (~50 MB fp16, cached after first download). */
+export function loadDepthModel(
+  url: string = MODEL_URL,
+  onProgress?: (pct: number) => void,
+): Promise<OrtTypes.InferenceSession> {
+  if (session) return Promise.resolve(session);
+  if (loadPromise) return loadPromise;
+
+  loadPromise = (async () => {
+    const ortMod = await ensureOrt();
+    await purgeOldDepthCaches(DEPTH_MODEL_VERSION);
+    // eslint-disable-next-line no-console
+    console.log("[depth-estimator] Loading Depth-Anything-V2-Small...");
+
+    const dataUrl = url + "_data";
+    const dataFileName = url.slice(url.lastIndexOf("/") + 1) + "_data";
+
+    // Fetch protobuf first (tiny, fast), then stream the large data file with progress.
+    const [modelBuffer, dataBuffer] = await Promise.all([
+      cachedFetch(url),
+      cachedFetch(dataUrl, onProgress),
+    ]);
+
+    session = await ortMod.InferenceSession.create(modelBuffer, {
+      executionProviders: ["wasm"],
+      graphOptimizationLevel: "all",
+      externalData: [{ path: dataFileName, data: dataBuffer }],
+    });
+    ensureBuffers();
+    // eslint-disable-next-line no-console
+    console.log("[depth-estimator] Model loaded. Input:", session.inputNames, "Output:", session.outputNames);
+    return session;
+  })().finally(() => { loadPromise = null; });
+
+  return loadPromise;
 }
 
 export function isDepthModelLoaded(): boolean {
@@ -123,6 +173,7 @@ export async function releaseDepthModel(): Promise<void> {
     console.warn("[depth-estimator] release session failed:", (e as Error).message);
   }
   session = null;
+  loadPromise = null;
   f32Buffer = null;
   offscreen = null;
   offCtx = null;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, CircleDot, Loader2, Play, Square, View } from "lucide-react";
+import { Camera, CircleDot, Layers, Loader2, Play, Square, View } from "lucide-react";
 
 import type { CameraStatus } from "../hooks/useCamera";
 import type { ModelStatus } from "../hooks/useDamageDetector";
@@ -10,6 +10,7 @@ interface CameraViewportProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   xrCanvasRef: React.RefObject<HTMLCanvasElement | null>;
+  depthCanvasRef: React.RefObject<HTMLCanvasElement | null>;
   cameraStatus: CameraStatus;
   modelStatus: ModelStatus;
   fps: number;
@@ -23,12 +24,17 @@ interface CameraViewportProps {
   xrError: string | null;
   onStartAR: () => void;
   onStopAR: () => void;
+  depthOverlayActive: boolean;
+  depthOverlayLoading: boolean;
+  depthDownloadPct: number;
+  onToggleDepth: () => void;
 }
 
 export function CameraViewport({
   videoRef,
   canvasRef,
   xrCanvasRef,
+  depthCanvasRef,
   cameraStatus,
   modelStatus,
   fps,
@@ -42,6 +48,10 @@ export function CameraViewport({
   xrError,
   onStartAR,
   onStopAR,
+  depthOverlayActive,
+  depthOverlayLoading,
+  depthDownloadPct,
+  onToggleDepth,
 }: CameraViewportProps) {
   const xrActive = xrStatus === "active";
   const isActive = cameraStatus === "active" || xrActive;
@@ -107,10 +117,22 @@ export function CameraViewport({
           ref={xrCanvasRef as React.RefObject<HTMLCanvasElement>}
           className={`absolute inset-0 w-full h-full object-contain ${xrActive ? "" : "hidden"}`}
         />
+        {/* Depth heatmap overlay — below detection boxes so bboxes stay visible */}
+        <canvas
+          ref={depthCanvasRef as React.RefObject<HTMLCanvasElement>}
+          className={`absolute inset-0 w-full h-full object-contain pointer-events-none ${depthOverlayActive ? "" : "hidden"}`}
+        />
         <canvas
           ref={canvasRef as React.RefObject<HTMLCanvasElement>}
           className="absolute inset-0 w-full h-full object-contain pointer-events-none"
         />
+        {/* Depth overlay badge */}
+        {depthOverlayActive && (
+          <div className="absolute top-2 right-2 px-2 py-1 rounded-md bg-violet-500/80 text-white text-xs font-semibold flex items-center gap-1">
+            <Layers size={12} />
+            Depth View
+          </div>
+        )}
         {/* AR mode badge */}
         {xrActive && (
           <div className="absolute top-2 left-2 px-2 py-1 rounded-md bg-emerald-500/80 text-white text-xs font-semibold flex items-center gap-1">
@@ -171,6 +193,31 @@ export function CameraViewport({
           <CircleDot size={16} />
           Capture frame
         </button>
+        {isActive && (
+          <button
+            type="button"
+            onClick={onToggleDepth}
+            disabled={depthOverlayLoading}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-sm font-medium transition-colors ${
+              depthOverlayActive
+                ? "border-violet-500 bg-violet-500/10 text-violet-700 dark:text-violet-400"
+                : "border-border text-foreground hover:bg-muted"
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {depthOverlayLoading ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Layers size={16} />
+            )}
+            {depthOverlayLoading
+              ? depthDownloadPct > 0
+                ? `${depthDownloadPct}%`
+                : "Loading…"
+              : depthOverlayActive
+                ? "Hide Depth"
+                : "Depth View"}
+          </button>
+        )}
         {xrAvailable && (
           xrActive ? (
             <button

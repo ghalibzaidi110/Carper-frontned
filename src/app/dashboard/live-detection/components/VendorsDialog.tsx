@@ -58,7 +58,7 @@ export function VendorsDialog({ entry, onClose }: VendorsDialogProps) {
                       </p>
                       <div className="flex flex-wrap items-center gap-2 mt-1.5 text-xs">
                         <span className="font-mono tabular-nums font-semibold text-foreground">
-                          {v.price.toLocaleString()} {v.currency}
+                          Rs {v.price.toLocaleString()}
                         </span>
                         {v.rating > 0 && (
                           <span className="flex items-center gap-0.5 text-amber-600 dark:text-amber-400">
