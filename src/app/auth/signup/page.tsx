@@ -20,6 +20,7 @@ function GoogleSignupContent() {
   } | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [cameFromLogin, setCameFromLogin] = useState(false);
   const { completeGoogleSignup } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -27,7 +28,10 @@ function GoogleSignupContent() {
   useEffect(() => {
     const googleParam = searchParams.get("google");
     const dataParam = searchParams.get("data");
-    
+    const via = searchParams.get("via");
+
+    setCameFromLogin(via === "login");
+
     if (googleParam === "true" && dataParam) {
       try {
         const decodedData = decodeURIComponent(dataParam);
@@ -107,6 +111,13 @@ function GoogleSignupContent() {
         </div>
 
         <div className="bg-card rounded-2xl border border-border shadow-card p-6">
+          {cameFromLogin && (
+            <div className="mb-4 p-3 rounded-lg bg-primary/10 border border-primary/20 text-sm text-foreground">
+              We couldn&apos;t find an existing account for this Google email.
+              Just a few more details and we&apos;ll create your account.
+            </div>
+          )}
+
           {/* Google Account Info */}
           <div className="mb-6 p-4 rounded-lg bg-muted border border-border">
             <p className="text-xs text-muted-foreground uppercase mb-2">Signing up with</p>
@@ -172,7 +183,7 @@ function GoogleSignupContent() {
                 placeholder="House 123, Street 5, DHA Phase 6"
                 className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" 
               />
-              <p className="text-xs text-muted-foreground mt-1">Please provide a complete address (minimum 10 characters)</p>
+              <p className="text-xs text-muted-foreground mt-1">Minimum 5 characters</p>
             </div>
 
             <div>

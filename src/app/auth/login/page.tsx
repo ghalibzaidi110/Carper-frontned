@@ -119,8 +119,7 @@ function LoginContent() {
                 type="button"
                 onClick={() => {
                   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
-                  const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3001";
-                  window.location.href = `${API_URL}/auth/google?from=login&redirect=${encodeURIComponent(`${FRONTEND_URL}/auth/callback?from=login`)}`;
+                  window.location.href = `${API_URL}/auth/google?from=login`;
                 }}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm font-medium hover:bg-muted transition-colors"
               >

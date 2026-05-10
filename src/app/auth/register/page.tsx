@@ -156,7 +156,7 @@ function RegisterContent() {
                 placeholder="House 123, Street 5, DHA Phase 6"
                 className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" 
               />
-              <p className="text-xs text-muted-foreground mt-1">Please provide a complete address (minimum 10 characters)</p>
+              <p className="text-xs text-muted-foreground mt-1">Minimum 5 characters</p>
             </div>
 
             <div>
@@ -210,8 +210,7 @@ function RegisterContent() {
                 type="button"
                 onClick={() => {
                   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
-                  const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3001";
-                  window.location.href = `${API_URL}/auth/google?from=register&redirect=${encodeURIComponent(`${FRONTEND_URL}/auth/callback?from=register`)}`;
+                  window.location.href = `${API_URL}/auth/google?from=register`;
                 }}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm font-medium hover:bg-muted transition-colors"
               >
