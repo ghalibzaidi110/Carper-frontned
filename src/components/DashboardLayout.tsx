@@ -22,7 +22,11 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL", "ADMIN"] },
   { label: "Live Detection", path: "/dashboard/live-detection", icon: <Camera size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL"] },
   { label: "My Scans", path: "/dashboard/scans", icon: <FolderOpen size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL"] },
-  { label: "Rentals", path: "/dashboard/rentals", icon: <Truck size={20} />, roles: ["CAR_RENTAL"] },
+  // Rentals link hidden from the FYP-scope sidebar (individual-user-only).
+  // The rentals module + pages still exist in the codebase for the
+  // long-term multi-stakeholder roadmap — re-add this NavItem to surface
+  // them again. See docs/REMAINING.md item 2.5.
+  // { label: "Rentals", path: "/dashboard/rentals", icon: <Truck size={20} />, roles: ["CAR_RENTAL"] },
   { label: "Users", path: "/admin/users", icon: <Users size={20} />, roles: ["ADMIN"] },
   { label: "Verifications", path: "/admin/verifications", icon: <Shield size={20} />, roles: ["ADMIN"] },
   { label: "Car Catalog", path: "/admin/catalog", icon: <Car size={20} />, roles: ["ADMIN"] },

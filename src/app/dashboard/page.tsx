@@ -3,17 +3,21 @@
 import StatCard from "@/components/StatCard";
 import StatusBadge from "@/components/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
-import { useDashboardStats, useNotifications, useRentalStats, useUnreadCount } from "@/hooks/use-api";
-import { ScanSearch, Bell, Truck, DollarSign, BarChart3, Loader2 } from "lucide-react";
+import { useDashboardStats, useNotifications, useUnreadCount } from "@/hooks/use-api";
+import { ScanSearch, Bell, Loader2 } from "lucide-react";
 import { getTimeAgo } from "@/lib/format";
+
+// FYP scope is individual-user-only — the rentals dashboard widget is
+// hidden along with the sidebar nav link. The Rental model + API + pages
+// still exist; just not surfaced. See docs/REMAINING.md item 2.5.
+// To restore: re-import `useRentalStats`, `Truck`, `DollarSign`, `BarChart3`
+// and uncomment the rental stats block below.
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: notifData } = useNotifications({ limit: 5 });
   const { data: unreadData } = useUnreadCount();
-  const { data: rentalStats } = useRentalStats();
-  const isRental = user?.role === "CAR_RENTAL";
 
   const rawNotifs = notifData?.data || notifData || [];
   const notifications = Array.isArray(rawNotifs) ? rawNotifs : rawNotifs?.data || [];
@@ -37,13 +41,8 @@ export default function DashboardPage() {
         </div>
       )}
 
-      {isRental && rentalStats && (
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <StatCard title="Active Rentals" value={rentalStats.activeRentals ?? 0} icon={Truck} variant="primary" />
-          <StatCard title="Completed Rentals" value={rentalStats.completedRentals ?? 0} icon={BarChart3} variant="success" />
-          <StatCard title="Total Revenue" value={`₨ ${((rentalStats.totalRevenue ?? 0) / 1000).toFixed(0)}K`} icon={DollarSign} variant="warning" />
-        </div>
-      )}
+      {/* Rentals stats panel hidden for FYP scope (individual-user only).
+          Rental data flow remains intact in the backend. */}
 
       <div className="bg-card rounded-xl border border-border shadow-card p-5">
         <h3 className="font-display font-semibold text-foreground mb-4">Recent Notifications</h3>

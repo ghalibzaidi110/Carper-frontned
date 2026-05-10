@@ -130,25 +130,11 @@ function GoogleSignupContent() {
               <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">{error}</div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Account Type</label>
-              <div className="flex gap-3">
-                {(["INDIVIDUAL", "CAR_RENTAL"] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setAccountType(type)}
-                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium border transition-colors ${
-                      accountType === type
-                        ? "bg-primary/10 border-primary text-primary"
-                        : "bg-background border-border text-muted-foreground hover:border-foreground/20"
-                    }`}
-                  >
-                    {type === "INDIVIDUAL" ? "Individual" : "Car Rental Business"}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Account type selector hidden for FYP scope — every new
+                signup is INDIVIDUAL. The CAR_RENTAL flow + business
+                fields below still exist (commented businessName /
+                businessLicense inputs) for the long-term roadmap.
+                See docs/REMAINING.md item 2.5. */}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
