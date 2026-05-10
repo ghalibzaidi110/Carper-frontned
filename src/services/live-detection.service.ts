@@ -64,6 +64,14 @@ export interface CostEstimatePayload {
   areaCm2?: number;
   perimCm?: number;
   severity?: "minor" | "moderate" | "significant" | "severe";
+  multipleDentsCount?: number;
+  partsCost?: number;
+  // Depth/measurement tier fields
+  scaleSource?: "webxr_depth" | "depth_model" | "panel_reference" | "fallback_estimate";
+  depthMm?: number;
+  depthSource?: "webxr" | "depth_model" | "heuristic";
+  depthCategory?: "shallow" | "moderate" | "deep";
+  relativeDepthDelta?: number;
 }
 
 export interface CostEstimateResponse {
@@ -72,10 +80,18 @@ export interface CostEstimateResponse {
   costHigh: number;
   currency: string;
   severity: string;
+  /** Human-readable severity, e.g. "Moderate (3.2% of hood area)" */
+  severityDetail?: string;
   decision: "repair" | "replace" | "unknown";
   unknownFeatures: string[];
-  /** Identifies which trained model produced this prediction (e.g. "v1"). */
+  /** 0–1 confidence score for this estimate (driven by scale source, unknowns, decision). */
+  estimateConfidence?: number;
+  /** Human-readable confidence explanation, e.g. "60% confidence: panel not fully visible" */
+  confidenceDetail?: string;
+  /** Identifies which trained model produced this prediction (e.g. "v4"). */
   modelVersion?: string;
+  /** Request ID for replay/audit — auto-generated if not provided */
+  requestId?: string;
   breakdown: {
     repairMethod: string;
     laborHours: number;
@@ -90,7 +106,15 @@ export interface CostEstimateResponse {
      *  - "client_provided"   client computed and sent
      *  - "fallback_estimate" fixed-distance assumption (least accurate)
      */
-    scaleSource?: "panel_reference" | "client_provided" | "fallback_estimate";
+    scaleSource?: "webxr_depth" | "depth_model" | "panel_reference" | "client_provided" | "fallback_estimate";
+    /** Absolute error margin in PKR */
+    errorMargin?: number;
+    /** Error margin as percentage of predicted cost */
+    errorMarginPct?: number;
+    /** Dent depth in mm (when available from WebXR) */
+    depthMm?: number | null;
+    /** Source of depth measurement */
+    depthSource?: "webxr" | "depth_model" | "heuristic" | null;
   };
 }
 

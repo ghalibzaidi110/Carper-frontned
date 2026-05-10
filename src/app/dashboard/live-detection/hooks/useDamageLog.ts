@@ -6,6 +6,8 @@ import { saveCapture } from "@/lib/live-detection/capture-store";
 import type { Bbox } from "@/lib/live-detection/iou";
 import { identifyPanel } from "@/lib/live-detection/part-segmenter";
 import type { Detection } from "@/lib/live-detection/tracks";
+import type { DepthEstimation, DepthSource } from "@/lib/live-detection/depth-estimator";
+import type { WebXRMeasurement } from "@/lib/live-detection/webxr-depth";
 import {
   type CostEstimateResponse,
   type VendorSearchResponse,
@@ -37,6 +39,22 @@ export interface LogEntry {
 
 interface UseDamageLogArgs {
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  /** Optional depth estimator — called during cost estimation for dent depth classification. */
+  estimateDepth?: (
+    source: DepthSource,
+    damageBbox: Bbox,
+    frameWidth: number,
+    frameHeight: number,
+    panelBbox?: Bbox | null,
+  ) => Promise<DepthEstimation | null>;
+  /** Whether WebXR AR mode is currently active (Tier 1). */
+  xrActive?: boolean;
+  /** WebXR measurement function — returns absolute dimensions when AR active. */
+  measureDamageXR?: (
+    damageBbox: Bbox,
+    frameWidth: number,
+    frameHeight: number,
+  ) => WebXRMeasurement | null;
 }
 
 interface UseDamageLogReturn {
@@ -84,7 +102,7 @@ async function captureRegion(
   return canvas.toDataURL("image/jpeg", 0.85);
 }
 
-export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn {
+export function useDamageLog({ videoRef, estimateDepth, xrActive, measureDamageXR }: UseDamageLogArgs): UseDamageLogReturn {
   const [entries, setEntries] = useState<LogEntry[]>([]);
   // Mirror entries into a ref for synchronous reads in async handlers.
   // setState updaters can be deferred / re-run under React 18 Strict Mode,
@@ -121,20 +139,50 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
       // a `tire_flat` is only allowed to match a `wheel`.
       const video = videoRef.current;
       if (video) {
-        identifyPanel(video, det.bbox, det.className).then((result) => {
-          setEntries((prev) =>
-            prev.map((e) =>
-              e.id === id
-                ? {
-                    ...e,
-                    panelLocation: result.panel,
-                    panelBbox: result.panelBbox ?? null,
-                    frameSize: result.frameSize ?? null,
-                  }
-                : e,
-            ),
-          );
-        });
+        // Retry panel identification up to 3 times across different frames.
+        // The parts model has weak confidence on single frames (motion blur,
+        // angle), so sampling multiple frames increases the chance of a
+        // successful identification.
+        const MAX_PANEL_RETRIES = 3;
+        const PANEL_RETRY_DELAY_MS = 500;
+        const panelTimeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("panel identification timed out")), 8000),
+        );
+        const attemptPanelId = async () => {
+          for (let attempt = 0; attempt < MAX_PANEL_RETRIES; attempt++) {
+            const v = videoRef.current;
+            if (!v || v.readyState < 2) break;
+            const result = await identifyPanel(v, det.bbox, det.className);
+            if (result.panel !== "unknown") return result;
+            if (attempt < MAX_PANEL_RETRIES - 1) {
+              await new Promise((r) => setTimeout(r, PANEL_RETRY_DELAY_MS));
+            }
+          }
+          return { panel: "unknown" as string };
+        };
+        Promise.race([attemptPanelId(), panelTimeout])
+          .then((result) => {
+            setEntries((prev) =>
+              prev.map((e) =>
+                e.id === id
+                  ? {
+                      ...e,
+                      panelLocation: result.panel,
+                      panelBbox: ("panelBbox" in result ? result.panelBbox : undefined) ?? null,
+                      frameSize: ("frameSize" in result ? result.frameSize : undefined) ?? null,
+                    }
+                  : e,
+              ),
+            );
+          })
+          .catch((err) => {
+            console.warn("[useDamageLog] panel ID failed:", err);
+            setEntries((prev) =>
+              prev.map((e) =>
+                e.id === id ? { ...e, panelLocation: "unknown" } : e,
+              ),
+            );
+          });
 
         // Async: capture cropped frame -> IndexedDB
         captureRegion(video, det.bbox)
@@ -169,11 +217,18 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
   const runEstimateInner = useCallback(
     async (entry: LogEntry, vehicle: Vehicle): Promise<LogEntry> => {
       const video = videoRef.current;
-      const frameArea = video ? video.videoWidth * video.videoHeight : 1280 * 720;
-      const [, , bw, bh] = entry.bbox;
-      const pxPerCm = Math.sqrt(frameArea) / 60;
-      const areaCm2 = +((bw / pxPerCm) * (bh / pxPerCm)).toFixed(2);
-      const perimCm = +((bw + bh) * 2 / pxPerCm).toFixed(2);
+      const vw = video?.videoWidth ?? 0;
+      const vh = video?.videoHeight ?? 0;
+      const frameArea = vw > 0 && vh > 0 ? vw * vh : 1280 * 720;
+
+      // Do NOT send client-computed areaCm2/perimCm. The backend computes
+      // area via three paths (panel_reference > client_provided > fallback).
+      // We previously always sent areaCm2 using the same inaccurate
+      // fixed-distance formula the backend uses as a last resort. That made
+      // the backend pick "client_provided" and suppressed the fallback
+      // accuracy warning in the UI. Now we omit these so the backend either
+      // uses panel-as-ruler (accurate, when panelBbox present) or correctly
+      // falls through to fallback_estimate (which triggers the UI warning).
 
       // Repair-flow needs a known panel — mirrors webxr/estimate.js:61-68
       if (REPAIR_TYPES.has(entry.className)) {
@@ -206,11 +261,39 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
 
       try {
         if (REPAIR_TYPES.has(entry.className)) {
+          // ── Tier 1: WebXR absolute measurements ──
+          let xrMeasurement: WebXRMeasurement | null = null;
+          if (xrActive && measureDamageXR && vw > 0 && vh > 0) {
+            try {
+              xrMeasurement = measureDamageXR(entry.bbox, vw, vh);
+            } catch {
+              // WebXR failure is non-fatal — fall through to tier 2
+            }
+          }
+
+          // ── Tier 2: Monocular depth model (when no WebXR) ──
+          let depthResult: DepthEstimation | null = null;
+          if (!xrMeasurement && estimateDepth && video && vw > 0 && vh > 0) {
+            try {
+              depthResult = await estimateDepth(
+                video,
+                entry.bbox,
+                vw,
+                vh,
+                entry.panelBbox,
+              );
+            } catch {
+              // Depth estimation failure is non-fatal — fall through to tiers 3-4
+            }
+          }
+
           const result = await liveDetectionService.estimateCost({
             className: entry.className,
             panelLocation: entry.panelLocation ?? undefined,
-            // Panel-as-ruler — backend will compute real cm² from these
-            // when available, falling back to legacy fixed-distance math.
+            // Panel-as-ruler — backend computes real cm² from panelBbox +
+            // frameSize when available. When missing, backend uses its own
+            // fallback_estimate path and flags it in scaleSource so the UI
+            // can warn the user about lower accuracy.
             panelBbox: entry.panelBbox ?? undefined,
             frameSize: entry.frameSize ?? undefined,
             vehicleCategory: resolveCategory(vehicle),
@@ -220,8 +303,20 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
             vehicleMake: vehicle.make,
             vehicleModel: vehicle.model,
             vehicleYear: vehicle.year,
-            areaCm2,
-            perimCm,
+            // Tier 1: WebXR absolute measurements — override area + depth
+            ...(xrMeasurement && {
+              scaleSource: "webxr_depth" as const,
+              areaCm2: xrMeasurement.areaCm2,
+              perimCm: xrMeasurement.perimCm,
+              depthMm: xrMeasurement.depthMm,
+              depthSource: "webxr" as const,
+            }),
+            // Tier 2: Depth model — only sent when no WebXR
+            ...(!xrMeasurement && depthResult && {
+              depthSource: "depth_model" as const,
+              depthCategory: depthResult.depthCategory,
+              relativeDepthDelta: depthResult.relativeDepthDelta,
+            }),
           });
           const updated: LogEntry = {
             ...entry,
@@ -273,7 +368,7 @@ export function useDamageLog({ videoRef }: UseDamageLogArgs): UseDamageLogReturn
         return failed;
       }
     },
-    [videoRef],
+    [videoRef, estimateDepth, xrActive, measureDamageXR],
   );
 
   const runEstimate = useCallback(

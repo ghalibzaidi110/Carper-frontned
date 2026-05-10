@@ -35,6 +35,9 @@ function formatDamageSize(
   cm2: number,
   scaleSource?: string,
 ): string {
+  if (scaleSource === "webxr_depth") {
+    return `${cm2.toFixed(0)} cm² (AR measured)`;
+  }
   if (scaleSource === "panel_reference") {
     return `${cm2.toFixed(0)} cm² (panel-anchored)`;
   }
@@ -66,7 +69,9 @@ export function EstimateDialog({ entry, onClose }: EstimateDialogProps) {
                   {displayName(entry.className)} on {panelLabel(entry.panelLocation)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Severity: <span className="capitalize">{est.severity}</span>
+                  {est.severityDetail
+                    ? est.severityDetail
+                    : <>Severity: <span className="capitalize">{est.severity}</span></>}
                 </p>
               </div>
               <span
@@ -120,6 +125,18 @@ export function EstimateDialog({ entry, onClose }: EstimateDialogProps) {
                   k: "Severity",
                   v: <span className="capitalize">{est.breakdown.severityScore}</span>,
                 },
+                // Depth info — shown when depth measurement is available
+                ...(est.breakdown.depthMm != null
+                  ? [{
+                      k: "Dent depth",
+                      v: `${est.breakdown.depthMm.toFixed(1)} mm (AR sensor)`,
+                    }]
+                  : est.breakdown.depthSource === "depth_model"
+                    ? [{
+                        k: "Dent depth",
+                        v: <span className="capitalize">{est.breakdown.severityScore === "deep" ? "Deep" : "Shallow"} (AI estimate)</span>,
+                      }]
+                    : []),
               ].map((row) => (
                 <div
                   key={row.k}
@@ -135,6 +152,29 @@ export function EstimateDialog({ entry, onClose }: EstimateDialogProps) {
               <p className="text-xs text-amber-700 dark:text-amber-400 bg-amber-500/10 border border-amber-500/30 rounded-md px-3 py-2">
                 Estimate widened due to unknown:{" "}
                 <span className="font-medium">{est.unknownFeatures.join(", ")}</span>
+              </p>
+            )}
+
+            {est.estimateConfidence !== undefined && est.estimateConfidence < 0.5 && (
+              <p className="text-xs text-red-700 dark:text-red-400 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2">
+                <span className="font-medium">Low confidence estimate</span>
+                {" — "}
+                {est.confidenceDetail
+                  ?? `${Math.round(est.estimateConfidence * 100)}%. Too many inputs are unknown or approximate.`}
+                {" "}Try re-scanning with the full panel visible and selecting the correct vehicle.
+              </p>
+            )}
+
+            {est.estimateConfidence !== undefined && est.estimateConfidence >= 0.5 &&
+              est.confidenceDetail && (
+              <p className="text-xs text-muted-foreground bg-muted/40 border border-border rounded-md px-3 py-2">
+                {est.confidenceDetail}
+              </p>
+            )}
+
+            {est.breakdown.scaleSource === "webxr_depth" && (
+              <p className="text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 rounded-md px-3 py-2">
+                Measurements taken via AR depth sensor (highest accuracy).
               </p>
             )}
 

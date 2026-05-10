@@ -15,9 +15,12 @@ import { VehicleSelect } from "./components/VehicleSelect";
 import { VendorsDialog } from "./components/VendorsDialog";
 import { useCamera } from "./hooks/useCamera";
 import { useDamageDetector } from "./hooks/useDamageDetector";
+import { useDepthEstimator } from "./hooks/useDepthEstimator";
 import { type LogEntry, REPAIR_TYPES, useDamageLog } from "./hooks/useDamageLog";
+import { useDepthOverlay } from "./hooks/useDepthOverlay";
 import { useDetectionLoop } from "./hooks/useDetectionLoop";
 import { useSecureContext } from "./hooks/useSecureContext";
+import { useWebXRDepth } from "./hooks/useWebXRDepth";
 
 const DETECTION_THRESHOLD = 0.4;
 
@@ -29,18 +32,37 @@ export default function LiveDetectionPage() {
   const [estimateAllLoading, setEstimateAllLoading] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const xrCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const depthCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const secureContext = useSecureContext();
   const detector = useDamageDetector();
   const camera = useCamera();
+  const depth = useDepthEstimator();
+  const xr = useWebXRDepth();
+
+  // Detection source: XR canvas when AR active, video otherwise
+  const sourceRef = xr.xrStatus === "active" ? xrCanvasRef : camera.videoRef;
+
+  const depthOverlay = useDepthOverlay({
+    sourceRef,
+    depthCanvasRef,
+    cameraActive: xr.xrStatus === "active" || camera.status === "active",
+  });
+
   const { detections, fps } = useDetectionLoop({
-    videoRef: camera.videoRef,
+    sourceRef,
     canvasRef,
-    active: camera.status === "active",
+    active: xr.xrStatus === "active" || camera.status === "active",
     threshold: DETECTION_THRESHOLD,
     modelReady: detector.status === "ready",
   });
-  const log = useDamageLog({ videoRef: camera.videoRef });
+  const log = useDamageLog({
+    videoRef: camera.videoRef,
+    estimateDepth: depth.estimateDepth,
+    xrActive: xr.xrStatus === "active",
+    measureDamageXR: xr.measureDamageXR,
+  });
 
   const handleAddDetection = useCallback(
     (det: Detection) => log.add(det),
@@ -78,6 +100,19 @@ export default function LiveDetectionPage() {
     if (!secureContext.ok) return; // banner already explains why
     void camera.start();
   }, [secureContext.ok, camera]);
+
+  const handleStartAR = useCallback(async () => {
+    if (!xrCanvasRef.current) return;
+    // Stop regular camera before starting XR — they can't share the device
+    camera.stop();
+    await xr.startAR(xrCanvasRef.current);
+  }, [camera, xr]);
+
+  const handleStopAR = useCallback(() => {
+    xr.stopAR();
+    // Restart regular camera after exiting AR
+    void camera.start();
+  }, [xr, camera]);
 
   // F-2: pause the camera when the tab goes hidden so the phone doesn't
   // burn battery + cellular data decoding video the user can't see. The
@@ -143,6 +178,8 @@ export default function LiveDetectionPage() {
           <CameraViewport
             videoRef={camera.videoRef}
             canvasRef={canvasRef}
+            xrCanvasRef={xrCanvasRef}
+            depthCanvasRef={depthCanvasRef}
             cameraStatus={camera.status}
             modelStatus={detector.status}
             fps={fps}
@@ -151,6 +188,15 @@ export default function LiveDetectionPage() {
             onStart={handleStartCamera}
             onStop={camera.stop}
             onCapture={handleCapture}
+            xrAvailable={xr.xrAvailable}
+            xrStatus={xr.xrStatus}
+            xrError={xr.xrError}
+            onStartAR={handleStartAR}
+            onStopAR={handleStopAR}
+            depthOverlayActive={depthOverlay.depthOverlayActive}
+            depthOverlayLoading={depthOverlay.depthOverlayLoading}
+            depthDownloadPct={depthOverlay.depthDownloadPct}
+            onToggleDepth={depthOverlay.toggleDepthOverlay}
           />
 
           <aside className="space-y-4">
@@ -162,6 +208,7 @@ export default function LiveDetectionPage() {
               onClear={log.clear}
               onEstimate={handleEstimate}
               onEstimateAll={handleEstimateAll}
+              onSetPanel={log.setPanelLocation}
               estimateAllLoading={estimateAllLoading}
             />
           </aside>

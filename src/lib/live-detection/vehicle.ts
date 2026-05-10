@@ -6,7 +6,7 @@
  * ⚠️ F-5: This list MUST stay in sync with the cost model's known
  * vehicles (KNOWN_MAKES / KNOWN_MODELS in c_python/app/cost.py). A
  * make/model that appears here but not in the Python list gets the
- * "+7% per unknown feature" widening on every estimate — silently.
+ * "+15% per unknown feature" error-band widening on every estimate.
  *
  * Source of truth: GET /api/v1/live-detection/known-vehicles
  * Use `validateAgainstCanonical()` below in dev to detect drift.
