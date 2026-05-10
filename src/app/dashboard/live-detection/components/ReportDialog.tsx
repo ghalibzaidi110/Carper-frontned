@@ -1,12 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { CheckCircle2, ExternalLink, Loader2, Printer, Save } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { getCaptureForEntry } from "@/lib/live-detection/capture-store";
 import { displayName } from "@/lib/live-detection/classes";
 import { PART_DISPLAY } from "@/lib/live-detection/part-segmenter";
-import type { Vehicle } from "@/lib/live-detection/vehicle";
+import {
+  buildPrintHtml,
+  summarizeForPrint,
+  type PrintEntry,
+} from "@/lib/live-detection/print-report";
+import { resolveCategory, type Vehicle } from "@/lib/live-detection/vehicle";
 
 import type { LogEntry } from "../hooks/useDamageLog";
 import type { SaveScanState } from "../hooks/useSaveScan";
@@ -22,119 +29,71 @@ interface ReportDialogProps {
   onSaveScan: () => void;
 }
 
-const USD_TO_PKR = 278;
-
 function panelLabel(panel: string | null | undefined): string {
   if (!panel || panel === "unknown") return "Unknown";
   return (PART_DISPLAY as Record<string, string>)[panel] ?? panel;
 }
 
-interface RowSummary {
-  total: number;
-  low: number;
-  high: number;
+/**
+ * Convert in-memory LogEntry[] into the shared PrintEntry shape the
+ * printable expects. Optionally fills `imageUrl` from a pre-built map
+ * of dataURLs gathered from IndexedDB.
+ */
+function toPrintEntries(entries: LogEntry[], imageUrls: Map<number, string>): PrintEntry[] {
+  return entries.map((e) => ({
+    id: e.id,
+    className: e.className,
+    panelLocation: e.panelLocation,
+    imageUrl: imageUrls.get(e.id) ?? null,
+    estimate: e.estimate
+      ? {
+          cost: e.estimate.cost,
+          costLow: e.estimate.costLow,
+          costHigh: e.estimate.costHigh,
+          severity: e.estimate.severity,
+          decision: e.estimate.decision,
+          unknownFeatures: e.estimate.unknownFeatures,
+          breakdown: e.estimate.breakdown
+            ? { repairMethod: e.estimate.breakdown.repairMethod }
+            : undefined,
+        }
+      : null,
+    vendors: e.vendors
+      ? {
+          vendors: e.vendors.vendors ?? null,
+          fallbackEstimate: e.vendors.fallbackEstimate
+            ? {
+                min: e.vendors.fallbackEstimate.min,
+                max: e.vendors.fallbackEstimate.max,
+                currency: e.vendors.fallbackEstimate.currency,
+              }
+            : null,
+        }
+      : null,
+    estimateError: e.estimateError,
+  }));
 }
 
-function summarize(entries: LogEntry[]): RowSummary {
-  let total = 0;
-  let low = 0;
-  let high = 0;
-  for (const e of entries) {
-    if (e.estimate) {
-      total += e.estimate.cost;
-      low += e.estimate.costLow;
-      high += e.estimate.costHigh;
-    } else if (e.vendors?.vendors?.length) {
-      const cheapest = e.vendors.vendors[0];
-      const priced = cheapest.currency === "USD" ? cheapest.price * USD_TO_PKR : cheapest.price;
-      total += priced;
-      low += priced;
-      high += priced * 1.15;
-    } else if (e.vendors?.fallbackEstimate) {
-      const f = e.vendors.fallbackEstimate;
-      total += (f.min + f.max) / 2;
-      low += f.min;
-      high += f.max;
-    }
-  }
-  return { total: Math.round(total), low: Math.round(low), high: Math.round(high) };
-}
-
-function buildPrintHtml(entries: LogEntry[], vehicle: Vehicle): string {
-  const summary = summarize(entries);
-  const date = new Date().toLocaleString();
-  const rows = entries
-    .map((e) => {
-      const cost = e.estimate
-        ? `${e.estimate.cost.toLocaleString()} PKR`
-        : e.vendors?.vendors?.[0]
-          ? `${e.vendors.vendors[0].price.toLocaleString()} ${e.vendors.vendors[0].currency}`
-          : e.vendors?.fallbackEstimate
-            ? `${e.vendors.fallbackEstimate.min.toLocaleString()}–${e.vendors.fallbackEstimate.max.toLocaleString()} PKR`
-            : "—";
-      const range = e.estimate
-        ? `${e.estimate.costLow.toLocaleString()}–${e.estimate.costHigh.toLocaleString()}`
-        : "";
-      return `
-        <tr>
-          <td>${displayName(e.className)}</td>
-          <td>${panelLabel(e.panelLocation)}</td>
-          <td>${e.estimate?.severity ?? "—"}</td>
-          <td>${e.estimate?.decision ?? (e.vendors ? "replace" : "—")}</td>
-          <td>${e.estimate?.breakdown?.repairMethod?.replace(/_/g, " ") ?? "—"}</td>
-          <td class="num">${cost}</td>
-          <td class="num small">${range}</td>
-        </tr>`;
-    })
-    .join("");
-  return `<!doctype html>
-<html>
-<head>
-<meta charset="utf-8" />
-<title>Carper damage report</title>
-<style>
-  * { box-sizing: border-box; }
-  body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; max-width: 920px; margin: 24px auto; padding: 0 24px; color: #111; }
-  h1 { font-size: 20px; margin: 0 0 4px 0; }
-  .meta { color: #555; font-size: 12px; margin-bottom: 24px; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #e5e5e5; }
-  th { background: #f5f5f5; font-weight: 600; text-transform: uppercase; font-size: 11px; letter-spacing: 0.04em; }
-  .num { text-align: right; font-variant-numeric: tabular-nums; }
-  .small { font-size: 11px; color: #666; }
-  .totals { margin-top: 18px; padding: 14px 16px; background: #f5f5f5; border-radius: 8px; display: flex; justify-content: space-between; align-items: baseline; }
-  .totals .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #666; }
-  .totals .amount { font-size: 22px; font-weight: 700; }
-  .totals .range { font-size: 12px; color: #555; margin-top: 2px; }
-  @media print { body { margin: 0; } }
-</style>
-</head>
-<body>
-  <h1>Carper Damage Report</h1>
-  <p class="meta">Generated ${date} · Vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model} · ${entries.length} item(s)</p>
-  <table>
-    <thead>
-      <tr>
-        <th>Damage</th>
-        <th>Panel</th>
-        <th>Severity</th>
-        <th>Decision</th>
-        <th>Method</th>
-        <th class="num">Cost</th>
-        <th class="num">Range</th>
-      </tr>
-    </thead>
-    <tbody>${rows}</tbody>
-  </table>
-  <div class="totals">
-    <div>
-      <div class="label">Total estimate</div>
-      <div class="range">Range ${summary.low.toLocaleString()} – ${summary.high.toLocaleString()} PKR</div>
-    </div>
-    <div class="amount">${summary.total.toLocaleString()} PKR</div>
-  </div>
-</body>
-</html>`;
+/**
+ * Pull each entry's captured JPEG out of IndexedDB. Runs in parallel —
+ * for ~10 entries this is well under a second. Entries with no capture
+ * (or a v1 IndexedDB record without entryId) just get omitted from the
+ * map; the printable renders a "No photo" placeholder for those.
+ */
+async function gatherIndexedDbImages(entries: LogEntry[]): Promise<Map<number, string>> {
+  const map = new Map<number, string>();
+  const lookups = await Promise.all(
+    entries.map(async (e) => {
+      try {
+        const cap = await getCaptureForEntry(e.id);
+        return cap?.dataUrl ? ([e.id, cap.dataUrl] as const) : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  for (const pair of lookups) if (pair) map.set(pair[0], pair[1]);
+  return map;
 }
 
 export function ReportDialog({
@@ -145,18 +104,55 @@ export function ReportDialog({
   saveState,
   onSaveScan,
 }: ReportDialogProps) {
-  const summary = summarize(entries);
+  // Reuse the shared print summary helper so the dialog totals and the
+  // printed report are guaranteed to match.
+  const printEntries = toPrintEntries(entries, new Map());
+  const summary = summarizeForPrint(printEntries);
   const saving = saveState.status === "preparing" || saveState.status === "uploading";
   const saved = saveState.status === "saved";
+  const [printing, setPrinting] = useState(false);
 
-  const handlePrint = () => {
-    const w = window.open("", "_blank");
-    if (!w) return;
-    w.document.open();
-    w.document.write(buildPrintHtml(entries, vehicle));
-    w.document.close();
-    w.focus();
-    setTimeout(() => w.print(), 300);
+  /**
+   * Open a printable HTML window. Loads the IndexedDB-captured damage
+   * photos first so the gallery isn't empty on freshly-logged scans
+   * (the photos haven't been uploaded to Cloudinary yet at this point).
+   */
+  const handlePrint = async () => {
+    if (printing) return;
+    setPrinting(true);
+    try {
+      const images = await gatherIndexedDbImages(entries);
+      const html = buildPrintHtml(toPrintEntries(entries, images), {
+        make: vehicle.make,
+        model: vehicle.model,
+        year: vehicle.year,
+        category: resolveCategory(vehicle),
+      });
+      const w = window.open("", "_blank");
+      if (!w) {
+        // Popup blocker — fall back to download. The user has to open
+        // the file manually but at least gets the report.
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `carper-damage-report-${Date.now()}.html`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return;
+      }
+      w.document.open();
+      w.document.write(html);
+      w.document.close();
+      w.focus();
+      // Give the print window a moment to lay out images before
+      // triggering the print dialog.
+      setTimeout(() => w.print(), 600);
+    } finally {
+      setPrinting(false);
+    }
   };
 
   return (
@@ -263,10 +259,11 @@ export function ReportDialog({
             <button
               type="button"
               onClick={handlePrint}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
+              disabled={printing || entries.length === 0}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              <Printer size={14} />
-              Download / Print PDF
+              {printing ? <Loader2 size={14} className="animate-spin" /> : <Printer size={14} />}
+              {printing ? "Preparing photos…" : "Download / Print PDF"}
             </button>
           </div>
 
