@@ -1,6 +1,7 @@
 "use client";
 
-import { Printer } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, ExternalLink, Loader2, Printer, Save } from "lucide-react";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { displayName } from "@/lib/live-detection/classes";
@@ -8,12 +9,17 @@ import { PART_DISPLAY } from "@/lib/live-detection/part-segmenter";
 import type { Vehicle } from "@/lib/live-detection/vehicle";
 
 import type { LogEntry } from "../hooks/useDamageLog";
+import type { SaveScanState } from "../hooks/useSaveScan";
 
 interface ReportDialogProps {
   open: boolean;
   entries: LogEntry[];
   vehicle: Vehicle;
   onClose: () => void;
+  /** Save state lifted to the page so closing the dialog mid-save still tracks. */
+  saveState: SaveScanState;
+  /** Trigger save — page wires this to useSaveScan().save. */
+  onSaveScan: () => void;
 }
 
 const USD_TO_PKR = 278;
@@ -131,8 +137,17 @@ function buildPrintHtml(entries: LogEntry[], vehicle: Vehicle): string {
 </html>`;
 }
 
-export function ReportDialog({ open, entries, vehicle, onClose }: ReportDialogProps) {
+export function ReportDialog({
+  open,
+  entries,
+  vehicle,
+  onClose,
+  saveState,
+  onSaveScan,
+}: ReportDialogProps) {
   const summary = summarize(entries);
+  const saving = saveState.status === "preparing" || saveState.status === "uploading";
+  const saved = saveState.status === "saved";
 
   const handlePrint = () => {
     const w = window.open("", "_blank");
@@ -218,7 +233,33 @@ export function ReportDialog({ open, entries, vehicle, onClose }: ReportDialogPr
             </table>
           </div>
 
-          <div className="flex justify-end pt-2 border-t border-border">
+          <div className="flex justify-between gap-2 pt-2 border-t border-border">
+            {/* Save scan — left side. Disabled while in flight; once saved, becomes a link. */}
+            {saved && saveState.savedScanId ? (
+              <Link
+                href={`/dashboard/scans/${saveState.savedScanId}`}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 text-sm font-medium hover:bg-emerald-500/20 transition-colors"
+              >
+                <CheckCircle2 size={14} />
+                Saved · View
+                <ExternalLink size={12} className="opacity-70" />
+              </Link>
+            ) : (
+              <button
+                type="button"
+                onClick={onSaveScan}
+                disabled={saving || entries.length === 0}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {saving
+                  ? saveState.status === "preparing"
+                    ? `Preparing… ${saveState.current}`
+                    : `Uploading… ${saveState.total} image${saveState.total === 1 ? "" : "s"}`
+                  : "Save scan"}
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handlePrint}
@@ -228,6 +269,12 @@ export function ReportDialog({ open, entries, vehicle, onClose }: ReportDialogPr
               Download / Print PDF
             </button>
           </div>
+
+          {saveState.status === "error" && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+              ⚠ Save failed: {saveState.error}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -11,6 +11,7 @@ import { DamageLog } from "./components/DamageLog";
 import { DetectionsList } from "./components/DetectionsList";
 import { EstimateDialog } from "./components/EstimateDialog";
 import { ReportDialog } from "./components/ReportDialog";
+import { SaveScanToast } from "./components/SaveScanToast";
 import { VehicleSelect } from "./components/VehicleSelect";
 import { VendorsDialog } from "./components/VendorsDialog";
 import { useCamera } from "./hooks/useCamera";
@@ -19,6 +20,7 @@ import { useDepthEstimator } from "./hooks/useDepthEstimator";
 import { type LogEntry, REPAIR_TYPES, useDamageLog } from "./hooks/useDamageLog";
 import { useDepthOverlay } from "./hooks/useDepthOverlay";
 import { useDetectionLoop } from "./hooks/useDetectionLoop";
+import { useSaveScan } from "./hooks/useSaveScan";
 import { useSecureContext } from "./hooks/useSecureContext";
 import { useWebXRDepth } from "./hooks/useWebXRDepth";
 
@@ -95,6 +97,13 @@ export default function LiveDetectionPage() {
       setEstimateAllLoading(false);
     }
   }, [log, vehicle]);
+
+  // Save-scan state lives at page level so closing the Report Dialog
+  // mid-save still tracks progress in the floating toast.
+  const saveScan = useSaveScan();
+  const handleSaveScan = useCallback(() => {
+    void saveScan.save(log.entries, vehicle);
+  }, [saveScan, log.entries, vehicle]);
 
   const handleStartCamera = useCallback(() => {
     if (!secureContext.ok) return; // banner already explains why
@@ -228,6 +237,14 @@ export default function LiveDetectionPage() {
         entries={log.entries}
         vehicle={vehicle}
         onClose={() => setOpenReport(false)}
+        saveState={saveScan.state}
+        onSaveScan={handleSaveScan}
+      />
+
+      <SaveScanToast
+        state={saveScan.state}
+        onDismiss={saveScan.reset}
+        onRetry={handleSaveScan}
       />
     </>
   );
