@@ -91,25 +91,8 @@ function RegisterContent() {
               <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">{error}</div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Account Type</label>
-              <div className="flex gap-3">
-                {(["INDIVIDUAL", "CAR_RENTAL"] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setAccountType(type)}
-                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium border transition-colors ${
-                      accountType === type
-                        ? "bg-primary/10 border-primary text-primary"
-                        : "bg-background border-border text-muted-foreground hover:border-foreground/20"
-                    }`}
-                  >
-                    {type === "INDIVIDUAL" ? "Individual" : "Car Rental Business"}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Account type selector hidden for FYP scope — every new
+                signup is INDIVIDUAL. See docs/REMAINING.md item 2.5. */}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -173,7 +156,7 @@ function RegisterContent() {
                 placeholder="House 123, Street 5, DHA Phase 6"
                 className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" 
               />
-              <p className="text-xs text-muted-foreground mt-1">Please provide a complete address (minimum 10 characters)</p>
+              <p className="text-xs text-muted-foreground mt-1">Minimum 5 characters</p>
             </div>
 
             <div>
@@ -227,8 +210,7 @@ function RegisterContent() {
                 type="button"
                 onClick={() => {
                   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
-                  const FRONTEND_URL = process.env.NEXT_PUBLIC_FRONTEND_URL || "http://localhost:3001";
-                  window.location.href = `${API_URL}/auth/google?from=register&redirect=${encodeURIComponent(`${FRONTEND_URL}/auth/callback?from=register`)}`;
+                  window.location.href = `${API_URL}/auth/google?from=register`;
                 }}
                 className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border bg-background text-foreground text-sm font-medium hover:bg-muted transition-colors"
               >
