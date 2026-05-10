@@ -14,6 +14,10 @@ import {
 
 import { displayName } from "@/lib/live-detection/classes";
 import { PART_DISPLAY } from "@/lib/live-detection/part-segmenter";
+import {
+  buildPrintHtml,
+  type PrintEntry,
+} from "@/lib/live-detection/print-report";
 import { formatPKR, getTimeAgo } from "@/lib/format";
 import {
   liveDetectionScansService,
@@ -55,8 +59,78 @@ export default function SavedScanDetailPage() {
     }
   }
 
+  /**
+   * Open the printable HTML in a new tab. Uses the same shared template
+   * as the live-detection Report Dialog so saved scans and live scans
+   * print identically. Cloudinary image URLs from `detectionsJson` are
+   * passed through directly — the template renders them in the gallery.
+   */
   function handlePrint() {
-    window.print();
+    if (!scan) return;
+    const printEntries: PrintEntry[] = scan.detectionsJson.map((e) => ({
+      id: e.id,
+      className: e.className,
+      panelLocation: e.panelLocation,
+      imageUrl: e.imageUrl ?? null,
+      estimate: e.estimate
+        ? {
+            cost: e.estimate.cost,
+            costLow: e.estimate.costLow,
+            costHigh: e.estimate.costHigh,
+            severity: e.estimate.severity,
+            decision: e.estimate.decision,
+            unknownFeatures: e.estimate.unknownFeatures,
+            breakdown: e.estimate.breakdown
+              ? { repairMethod: e.estimate.breakdown.repairMethod }
+              : undefined,
+          }
+        : null,
+      vendors: e.vendors
+        ? {
+            vendors: e.vendors.vendors ?? null,
+            fallbackEstimate: e.vendors.fallbackEstimate
+              ? {
+                  min: e.vendors.fallbackEstimate.min,
+                  max: e.vendors.fallbackEstimate.max,
+                  currency: e.vendors.fallbackEstimate.currency,
+                }
+              : null,
+          }
+        : null,
+      estimateError: e.estimateError,
+    }));
+    const html = buildPrintHtml(
+      printEntries,
+      {
+        make: scan.vehicleMake,
+        model: scan.vehicleModel,
+        year: scan.vehicleYear,
+        category: scan.vehicleCategory,
+      },
+      { date: new Date(scan.createdAt), reportId: `RPT-${scan.id.slice(0, 8).toUpperCase()}` },
+    );
+    const w = window.open("", "_blank");
+    if (!w) {
+      // Popup blocker — fall back to download.
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `carper-damage-report-${scan.id}.html`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return;
+    }
+    w.document.open();
+    w.document.write(html);
+    w.document.close();
+    w.focus();
+    // Cloudinary images need a beat to load before print fires; the
+    // images are eager-loaded but cross-origin so the browser still
+    // does a real network fetch in the print window.
+    setTimeout(() => w.print(), 1200);
   }
 
   if (error) {
