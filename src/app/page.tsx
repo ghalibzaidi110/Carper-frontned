@@ -15,7 +15,7 @@ export default function LandingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground selection:bg-primary/30 overflow-x-hidden">
       {/* ─── Section 1 · Hero ────────────────────────────────── */}
-      <section className="relative h-screen min-h-[640px] flex flex-col overflow-hidden">
+      <section className="relative min-h-screen md:h-screen md:min-h-[640px] flex flex-col overflow-hidden">
         <HeroBackground />
 
         {/* Floating navbar */}
@@ -60,18 +60,18 @@ export default function LandingPage() {
         </nav>
 
         {/* Hero body */}
-        <div className="relative z-10 flex-1 container mx-auto px-6 lg:px-10 py-6 lg:py-10 flex items-center">
-          <div className="grid lg:grid-cols-[1.1fr_1fr] gap-8 lg:gap-10 items-center w-full">
+        <div className="relative z-10 flex-1 container mx-auto px-6 lg:px-10 py-4 md:py-6 lg:py-8 flex items-start">
+          <div className="grid lg:grid-cols-[1.1fr_1fr] gap-5 md:gap-8 lg:gap-10 items-center w-full">
             {/* Copy */}
             <div className="max-w-xl">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/30 mb-5">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/30 mb-3 md:mb-5">
                 <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
                 <span className="text-[11px] font-semibold text-primary uppercase tracking-[0.18em]">
                   AI Damage Detection
                 </span>
               </div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-5xl xl:text-6xl 2xl:text-7xl font-display font-bold leading-[1.05] tracking-[-0.025em]">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-5xl xl:text-6xl 2xl:text-7xl font-display font-bold leading-[1.05] tracking-[-0.025em]">
                 Every dent.{" "}
                 <span className="bg-gradient-to-r from-primary via-cyan-300 to-primary bg-clip-text text-transparent">
                   Detected
@@ -79,12 +79,12 @@ export default function LandingPage() {
                 in seconds.
               </h1>
 
-              <p className="mt-5 text-sm lg:text-base text-muted-foreground leading-relaxed max-w-lg">
+              <p className="mt-3 md:mt-5 text-sm lg:text-base text-muted-foreground leading-relaxed max-w-lg">
                 Carper turns any photo or live camera into a precise damage report.
                 Trained AI flags every issue, scores severity, and writes the report for you.
               </p>
 
-              <div className="mt-7 flex items-center gap-5">
+              <div className="mt-5 md:mt-7 flex items-center gap-5">
                 <Link
                   href={primaryHref}
                   className="group inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-all shadow-[0_0_40px_-8px_hsl(195_100%_50%/0.8)]"
@@ -104,7 +104,7 @@ export default function LandingPage() {
             </div>
 
             {/* Wireframe car */}
-            <div className="relative hidden md:block">
+            <div className="relative">
               <WireframeCar />
             </div>
           </div>
@@ -349,7 +349,7 @@ function WireframeCar() {
               >
                 <span className={`absolute inset-0 -m-2 rounded-full blur-sm ${tone.ring}`} />
                 <span
-                  className={`relative block h-2.5 w-2.5 rounded-full ${tone.dot}`}
+                  className={`relative block h-1.5 w-1.5 md:h-2.5 md:w-2.5 rounded-full ${tone.dot}`}
                   style={{ boxShadow: "0 0 12px currentColor" }}
                 />
               </div>
@@ -362,18 +362,17 @@ function WireframeCar() {
             return (
               <div
                 key={`card-${i}`}
-                className={`absolute rounded-md border overflow-hidden bg-black/55 backdrop-blur-sm ${tone.box} ${tone.glow} z-20`}
+                className={`absolute rounded-md border overflow-hidden bg-black/55 backdrop-blur-sm w-[52px] md:w-[82px] ${tone.box} ${tone.glow} z-20`}
                 style={{
                   left: `${c.card.x}%`,
                   top: `${c.card.y}%`,
                   transform: "translate(-50%, -50%)",
-                  width: "82px",
                 }}
               >
                 {/* Header */}
-                <div className="px-1.5 py-1 flex items-center gap-1 border-b border-current/20">
+                <div className="px-1 py-0.5 md:px-1.5 md:py-1 flex items-center gap-1 border-b border-current/20">
                   <span className={`h-1 w-1 rounded-full ${tone.dot} flex-shrink-0`} />
-                  <p className={`text-[8px] font-bold tracking-wider uppercase ${tone.text} truncate`}>
+                  <p className={`text-[6px] md:text-[8px] font-bold tracking-wider uppercase ${tone.text} truncate`}>
                     DMG {i + 1}
                   </p>
                 </div>
@@ -390,11 +389,11 @@ function WireframeCar() {
                   />
                   {/* Bottom label overlay */}
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent h-3/4" />
-                  <div className="absolute bottom-1 left-1.5 right-1.5">
-                    <p className={`text-[8px] font-bold uppercase tracking-wide ${tone.text} leading-tight`}>
+                  <div className="absolute bottom-0.5 left-1 right-1 md:bottom-1 md:left-1.5 md:right-1.5">
+                    <p className={`text-[6px] md:text-[8px] font-bold uppercase tracking-wide ${tone.text} leading-tight`}>
                       {c.title}
                     </p>
-                    <p className="text-[8px] font-mono text-white/80 truncate leading-tight">
+                    <p className="text-[6px] md:text-[8px] font-mono text-white/80 truncate leading-tight">
                       {c.sub}
                     </p>
                   </div>
