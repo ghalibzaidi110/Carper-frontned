@@ -91,12 +91,27 @@ export function VehicleSelect({ value, onChange }: VehicleSelectProps) {
             value={value.year}
             min={1950}
             max={new Date().getFullYear()}
-            onChange={(e) =>
+            maxLength={4}
+            onInput={(e) => {
+              const el = e.currentTarget;
+              if (el.value.length > 4) el.value = el.value.slice(0, 4);
+            }}
+            onKeyDown={(e) => {
+              if (
+                e.currentTarget.value.length >= 4 &&
+                /^\d$/.test(e.key) &&
+                e.currentTarget.selectionStart === e.currentTarget.selectionEnd
+              ) {
+                e.preventDefault();
+              }
+            }}
+            onChange={(e) => {
+              const digits = e.target.value.slice(0, 4);
               onChange({
                 ...value,
-                year: parseInt(e.target.value, 10) || value.year,
-              })
-            }
+                year: parseInt(digits, 10) || value.year,
+              });
+            }}
             className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-ring tabular-nums"
           />
         </div>
