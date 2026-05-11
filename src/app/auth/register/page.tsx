@@ -79,7 +79,8 @@ function RegisterContent() {
             <img
               src="/mainlogo.png"
               alt="Carper logo"
-              className="h-14 w-14 rounded-lg object-contain"
+              style={{ width: 72, height: 72 }}
+              className="rounded-lg object-contain"
             />
             <span className="font-display font-bold text-2xl text-foreground">Carper</span>
           </Link>

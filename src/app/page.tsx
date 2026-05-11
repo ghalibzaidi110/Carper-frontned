@@ -24,10 +24,11 @@ export default function LandingPage() {
             <Image
               src="/mainlogo.png"
               alt="Carper logo"
-              width={56}
-              height={56}
+              width={72}
+              height={72}
               priority
-              className="h-14 w-14 rounded-lg shadow-[0_0_24px_-4px_hsl(195_100%_50%/0.7)] object-contain"
+              style={{ width: 72, height: 72 }}
+              className="rounded-lg object-contain"
             />
             <span className="font-display font-bold text-lg tracking-tight">Carper</span>
           </Link>

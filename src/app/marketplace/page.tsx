@@ -39,7 +39,8 @@ export default function MarketplacePage() {
             <img
               src="/mainlogo.png"
               alt="Carper logo"
-              className="h-12 w-12 rounded-lg object-contain"
+              style={{ width: 60, height: 60 }}
+              className="rounded-lg object-contain"
             />
             <span className="font-display font-bold text-xl text-foreground">Carper</span>
           </Link>
