@@ -92,9 +92,12 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
       >
         {/* Logo */}
         <div className="flex items-center gap-3 h-20 px-4 border-b border-sidebar-border overflow-hidden">
-          <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-md">
-            <Car size={22} className="text-primary-foreground" />
-          </div>
+          <img
+            src="/mainlogo.png"
+            alt="Carper logo"
+            style={{ width: 64, height: 64 }}
+            className="rounded-xl flex-shrink-0 shadow-md object-contain"
+          />
           <div
             className={cn(
               "min-w-0 transition-opacity duration-200",

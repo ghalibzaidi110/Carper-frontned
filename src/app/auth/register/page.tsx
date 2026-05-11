@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { Car, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 function RegisterContent() {
   const [accountType, setAccountType] = useState<"INDIVIDUAL" | "CAR_RENTAL">("INDIVIDUAL");
@@ -76,9 +76,12 @@ function RegisterContent() {
       <div className="w-full max-w-lg">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-              <Car size={22} className="text-primary-foreground" />
-            </div>
+            <img
+              src="/mainlogo.png"
+              alt="Carper logo"
+              style={{ width: 96, height: 96 }}
+              className="rounded-lg object-contain"
+            />
             <span className="font-display font-bold text-2xl text-foreground">Carper</span>
           </Link>
           <h1 className="text-2xl font-display font-bold text-foreground">Create Account</h1>
