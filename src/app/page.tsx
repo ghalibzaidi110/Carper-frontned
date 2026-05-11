@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
-import { Car, ArrowRight, Check, Images, SwitchCamera } from "lucide-react";
+import { ArrowRight, Check, Images, SwitchCamera } from "lucide-react";
 import heroBg from "@/assets/hero-bg.jpg";
 
 export default function LandingPage() {
@@ -198,9 +198,14 @@ export default function LandingPage() {
           {/* Slim footer */}
           <div className="mt-10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/40">
             <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-md bg-primary/20 border border-primary/30 flex items-center justify-center">
-                <Car size={14} className="text-primary" />
-              </div>
+              <Image
+                src="/mainlogo.png"
+                alt="Carper logo"
+                width={28}
+                height={28}
+                style={{ width: 28, height: 28 }}
+                className="rounded-md object-contain"
+              />
               <span className="font-semibold text-muted-foreground">Carper</span>
               <span>· AI Damage Detection</span>
             </div>
@@ -591,9 +596,9 @@ function LiveCameraFrame() {
                 <div className="h-10 w-10 rounded-lg overflow-hidden border border-white/25 bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center">
                   <Images size={14} className="text-white/80" strokeWidth={2} />
                 </div>
-                {/* Shutter button */}
-                <div className="relative h-16 w-16 rounded-full bg-white/95 border-4 border-white/30 shadow-[0_0_30px_-5px_rgba(255,255,255,0.6)] flex items-center justify-center">
-                  <span className="h-10 w-10 rounded-full bg-white border border-black/10" />
+                {/* Shutter button — iOS style: transparent ring + solid inner circle */}
+                <div className="relative h-16 w-16 rounded-full border-[3px] border-white flex items-center justify-center shadow-[0_0_30px_-5px_rgba(255,255,255,0.6)]">
+                  <span className="h-12 w-12 rounded-full bg-white" />
                 </div>
                 {/* Flip camera */}
                 <div className="h-10 w-10 rounded-lg border border-white/15 bg-white/10 backdrop-blur-sm flex items-center justify-center">
