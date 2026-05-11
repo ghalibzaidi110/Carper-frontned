@@ -95,7 +95,7 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
           <img
             src="/mainlogo.png"
             alt="Carper logo"
-            style={{ width: 60, height: 60 }}
+            style={{ width: 64, height: 64 }}
             className="rounded-xl flex-shrink-0 shadow-md object-contain"
           />
           <div

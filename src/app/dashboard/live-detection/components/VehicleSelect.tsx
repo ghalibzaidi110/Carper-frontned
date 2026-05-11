@@ -32,9 +32,9 @@ export function VehicleSelect({ value, onChange }: VehicleSelectProps) {
         <h3 className="text-sm font-semibold text-foreground">Vehicle</h3>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {/* Make */}
-        <div className="col-span-2">
+        <div className="sm:col-span-2">
           <label className="block text-xs font-medium text-muted-foreground mb-1">Make</label>
           <select
             value={value.make}
@@ -48,7 +48,7 @@ export function VehicleSelect({ value, onChange }: VehicleSelectProps) {
                 year: newModel ? clampYear(newModel, value.year) : value.year,
               });
             }}
-            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
             {MAKES.map((m) => (
               <option key={m} value={m}>
@@ -72,7 +72,7 @@ export function VehicleSelect({ value, onChange }: VehicleSelectProps) {
                 year: entry ? clampYear(entry, value.year) : value.year,
               });
             }}
-            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
             {models.map((m) => (
               <option key={m.model} value={m.model}>
@@ -87,18 +87,17 @@ export function VehicleSelect({ value, onChange }: VehicleSelectProps) {
           <label className="block text-xs font-medium text-muted-foreground mb-1">Year</label>
           <input
             type="number"
+            inputMode="numeric"
             value={value.year}
-            min={currentModel?.min ?? 2000}
-            max={currentModel?.max ?? 2024}
+            min={1950}
+            max={new Date().getFullYear()}
             onChange={(e) =>
               onChange({
                 ...value,
-                year: currentModel
-                  ? clampYear(currentModel, parseInt(e.target.value, 10) || value.year)
-                  : parseInt(e.target.value, 10) || value.year,
+                year: parseInt(e.target.value, 10) || value.year,
               })
             }
-            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring tabular-nums"
+            className="w-full px-3 py-2 rounded-lg border border-input bg-background text-foreground text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-ring tabular-nums"
           />
         </div>
       </div>

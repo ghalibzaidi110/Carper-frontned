@@ -54,7 +54,7 @@ function LoginContent() {
             <img
               src="/mainlogo.png"
               alt="Carper logo"
-              style={{ width: 72, height: 72 }}
+              style={{ width: 96, height: 96 }}
               className="rounded-lg object-contain"
             />
             <span className="font-display font-bold text-2xl text-foreground">Carper</span>
