@@ -96,7 +96,7 @@ async function captureRegion(
   canvas.height = ch;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-  ctx.drawImage(videoEl, cx, cy, cw, ch, 0, 0, cw, ch);
+  ctx.drawImage(source, cx, cy, cw, ch, 0, 0, cw, ch);
   // outline the original damage region inside the crop
   ctx.strokeStyle = "#ff4757";
   ctx.lineWidth = 3;
@@ -186,7 +186,9 @@ export function useDamageLog({ videoRef, xrCanvasRef, estimateDepth, xrActive, m
             );
           });
 
-        // Async: capture cropped frame -> IndexedDB.
+        // Async: capture cropped frame -> IndexedDB. We pass `entryId`
+        // through so the Save-scan flow can later look up this capture
+        // by entry without scanning the whole store.
         // In AR mode the video element is hidden; use the XR canvas instead.
         const captureSource: HTMLVideoElement | HTMLCanvasElement | null =
           xrActive && xrCanvasRef?.current ? xrCanvasRef.current : video;
@@ -194,6 +196,7 @@ export function useDamageLog({ videoRef, xrCanvasRef, estimateDepth, xrActive, m
           .then((dataUrl) => {
             if (!dataUrl) return;
             return saveCapture({
+              entryId: id,
               className: det.className,
               classId: det.classId,
               confidence: det.confidence,

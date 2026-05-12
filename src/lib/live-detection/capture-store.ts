@@ -6,8 +6,14 @@
 import type { Bbox } from "./iou";
 
 const DB_NAME = "carper-damage-captures";
-const DB_VERSION = 1;
+// v2: added the `entryId` field + index so the Save-scan flow can look
+// up a capture by its in-memory LogEntry id without scanning the whole
+// store. Existing v1 records (without entryId) keep working — they
+// just won't show up in entry-id queries, which is the correct outcome
+// because they pre-date the current session's LogEntry ids anyway.
+const DB_VERSION = 2;
 const STORE = "captures";
+const ENTRY_ID_INDEX = "by_entry_id";
 
 export interface CaptureInput {
   className: string;
@@ -15,6 +21,8 @@ export interface CaptureInput {
   confidence: number;
   bbox: Bbox;
   dataUrl: string;
+  /** Frontend-side LogEntry id, so save-scan can match images to entries. */
+  entryId?: number;
 }
 
 export interface CaptureRecord extends CaptureInput {
@@ -31,8 +39,22 @@ function openDB(): Promise<IDBDatabase> {
     req.onupgradeneeded = (e) => {
       const target = e.target as IDBOpenDBRequest;
       const d = target.result;
+      let store: IDBObjectStore;
       if (!d.objectStoreNames.contains(STORE)) {
-        d.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
+        store = d.createObjectStore(STORE, { keyPath: "id", autoIncrement: true });
+      } else {
+        // Existing store — pull it out of the version-change transaction
+        // so we can add the index below.
+        const tx = target.transaction;
+        if (!tx) return;
+        store = tx.objectStore(STORE);
+      }
+      // v2: add an index on entryId. `unique: false` because old records
+      // have no entryId, and even within a session multiple captures of
+      // the same entry id are theoretically possible if the user logs the
+      // same detection twice (rare, but don't crash on it).
+      if (!store.indexNames.contains(ENTRY_ID_INDEX)) {
+        store.createIndex(ENTRY_ID_INDEX, "entryId", { unique: false });
       }
     };
     req.onsuccess = (e) => {
@@ -66,6 +88,28 @@ export async function getCaptures(): Promise<CaptureRecord[]> {
     req.onsuccess = (e) => {
       const items = (e.target as IDBRequest<CaptureRecord[]>).result || [];
       resolve(items.reverse());
+    };
+    req.onerror = (e) => reject((e.target as IDBRequest).error);
+  });
+}
+
+/**
+ * Find the most recent capture stored for a given LogEntry id. Returns
+ * `null` if no capture is associated (entry not yet captured, capture
+ * pruned, or pre-v2 record without entryId). Used by the Save-scan
+ * flow to gather images for upload without scanning the whole store.
+ */
+export async function getCaptureForEntry(entryId: number): Promise<CaptureRecord | null> {
+  const d = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = d.transaction(STORE, "readonly");
+    const idx = tx.objectStore(STORE).index(ENTRY_ID_INDEX);
+    const req = idx.getAll(entryId);
+    req.onsuccess = (e) => {
+      const records = (e.target as IDBRequest<CaptureRecord[]>).result || [];
+      // Prefer the newest record if duplicates exist.
+      records.sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp));
+      resolve(records[0] ?? null);
     };
     req.onerror = (e) => reject((e.target as IDBRequest).error);
   });

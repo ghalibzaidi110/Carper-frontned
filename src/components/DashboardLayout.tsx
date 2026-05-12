@@ -6,7 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, Car, Users, Shield,
-  BarChart3, Bell, UserCircle, LogOut, Menu, X, Truck, Camera, ChevronDown
+  BarChart3, Bell, UserCircle, LogOut, Menu, X, Truck, Camera, ChevronDown, FolderOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUnreadCount } from "@/hooks/use-api";
@@ -21,7 +21,12 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: <LayoutDashboard size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL", "ADMIN"] },
   { label: "Live Detection", path: "/dashboard/live-detection", icon: <Camera size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL"] },
-  { label: "Rentals", path: "/dashboard/rentals", icon: <Truck size={20} />, roles: ["CAR_RENTAL"] },
+  { label: "My Scans", path: "/dashboard/scans", icon: <FolderOpen size={20} />, roles: ["INDIVIDUAL", "CAR_RENTAL"] },
+  // Rentals link hidden from the FYP-scope sidebar (individual-user-only).
+  // The rentals module + pages still exist in the codebase for the
+  // long-term multi-stakeholder roadmap — re-add this NavItem to surface
+  // them again. See docs/REMAINING.md item 2.5.
+  // { label: "Rentals", path: "/dashboard/rentals", icon: <Truck size={20} />, roles: ["CAR_RENTAL"] },
   { label: "Users", path: "/admin/users", icon: <Users size={20} />, roles: ["ADMIN"] },
   { label: "Verifications", path: "/admin/verifications", icon: <Shield size={20} />, roles: ["ADMIN"] },
   { label: "Car Catalog", path: "/admin/catalog", icon: <Car size={20} />, roles: ["ADMIN"] },
@@ -87,9 +92,12 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
       >
         {/* Logo */}
         <div className="flex items-center gap-3 h-20 px-4 border-b border-sidebar-border overflow-hidden">
-          <div className="h-11 w-11 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 shadow-md">
-            <Car size={22} className="text-primary-foreground" />
-          </div>
+          <img
+            src="/mainlogo.png"
+            alt="Carper logo"
+            style={{ width: 64, height: 64 }}
+            className="rounded-xl flex-shrink-0 shadow-md object-contain"
+          />
           <div
             className={cn(
               "min-w-0 transition-opacity duration-200",

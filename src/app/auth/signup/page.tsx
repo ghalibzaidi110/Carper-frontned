@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { Car, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 function GoogleSignupContent() {
   const [accountType, setAccountType] = useState<"INDIVIDUAL" | "CAR_RENTAL">("INDIVIDUAL");
@@ -20,6 +20,7 @@ function GoogleSignupContent() {
   } | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [cameFromLogin, setCameFromLogin] = useState(false);
   const { completeGoogleSignup } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -27,7 +28,10 @@ function GoogleSignupContent() {
   useEffect(() => {
     const googleParam = searchParams.get("google");
     const dataParam = searchParams.get("data");
-    
+    const via = searchParams.get("via");
+
+    setCameFromLogin(via === "login");
+
     if (googleParam === "true" && dataParam) {
       try {
         const decodedData = decodeURIComponent(dataParam);
@@ -97,9 +101,12 @@ function GoogleSignupContent() {
       <div className="w-full max-w-lg">
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="h-10 w-10 rounded-lg bg-primary flex items-center justify-center">
-              <Car size={22} className="text-primary-foreground" />
-            </div>
+            <img
+              src="/mainlogo.png"
+              alt="Carper logo"
+              style={{ width: 96, height: 96 }}
+              className="rounded-lg object-contain"
+            />
             <span className="font-display font-bold text-2xl text-foreground">Carper</span>
           </Link>
           <h1 className="text-2xl font-display font-bold text-foreground">Complete Your Signup</h1>
@@ -107,6 +114,13 @@ function GoogleSignupContent() {
         </div>
 
         <div className="bg-card rounded-2xl border border-border shadow-card p-6">
+          {cameFromLogin && (
+            <div className="mb-4 p-3 rounded-lg bg-primary/10 border border-primary/20 text-sm text-foreground">
+              We couldn&apos;t find an existing account for this Google email.
+              Just a few more details and we&apos;ll create your account.
+            </div>
+          )}
+
           {/* Google Account Info */}
           <div className="mb-6 p-4 rounded-lg bg-muted border border-border">
             <p className="text-xs text-muted-foreground uppercase mb-2">Signing up with</p>
@@ -130,25 +144,11 @@ function GoogleSignupContent() {
               <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20 text-sm text-destructive">{error}</div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-2">Account Type</label>
-              <div className="flex gap-3">
-                {(["INDIVIDUAL", "CAR_RENTAL"] as const).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => setAccountType(type)}
-                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium border transition-colors ${
-                      accountType === type
-                        ? "bg-primary/10 border-primary text-primary"
-                        : "bg-background border-border text-muted-foreground hover:border-foreground/20"
-                    }`}
-                  >
-                    {type === "INDIVIDUAL" ? "Individual" : "Car Rental Business"}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Account type selector hidden for FYP scope — every new
+                signup is INDIVIDUAL. The CAR_RENTAL flow + business
+                fields below still exist (commented businessName /
+                businessLicense inputs) for the long-term roadmap.
+                See docs/REMAINING.md item 2.5. */}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -186,7 +186,7 @@ function GoogleSignupContent() {
                 placeholder="House 123, Street 5, DHA Phase 6"
                 className="w-full px-3 py-2.5 rounded-lg border border-input bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring" 
               />
-              <p className="text-xs text-muted-foreground mt-1">Please provide a complete address (minimum 10 characters)</p>
+              <p className="text-xs text-muted-foreground mt-1">Minimum 5 characters</p>
             </div>
 
             <div>

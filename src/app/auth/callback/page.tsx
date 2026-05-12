@@ -12,80 +12,67 @@ function OAuthCallbackContent() {
   const { refreshUser } = useAuth();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState("");
+  const [headline, setHeadline] = useState("Completing Sign In...");
+  const [subline, setSubline] = useState("Please wait while we complete your authentication.");
 
   useEffect(() => {
     const handleCallback = async () => {
+      // `via` is set by the backend: "login" if the user originated on the
+      // login page, "register" if they came from the register page. Used
+      // to fall back to the right page on error and to explain when an
+      // existing account is auto-logged-in from a signup attempt.
+      const viaRaw = searchParams.get("via");
+      const via: "login" | "register" = viaRaw === "register" ? "register" : "login";
+
       try {
-        // Extract tokens from URL query params
         const accessToken = searchParams.get("accessToken");
         const refreshToken = searchParams.get("refreshToken");
-        const error = searchParams.get("error");
-        const errorMessage = searchParams.get("errorMessage") || searchParams.get("message");
-        const fromPage = searchParams.get("from") || "login"; // Track which page user came from
-        const googleParam = searchParams.get("google");
-        const googleDataParam = searchParams.get("data");
+        const oauthError = searchParams.get("error");
+        const oauthErrorMessage = searchParams.get("errorMessage") || searchParams.get("message");
 
-        // Check for error from OAuth provider or backend
-        if (error || errorMessage) {
-          const errorMsg = errorMessage 
-            ? decodeURIComponent(errorMessage)
-            : error === "access_denied" 
-            ? "OAuth authorization was denied. Please try again." 
-            : error === "server_error"
+        if (oauthError || oauthErrorMessage) {
+          const msg = oauthErrorMessage
+            ? decodeURIComponent(oauthErrorMessage)
+            : oauthError === "access_denied"
+            ? "Google authorization was denied. Please try again."
+            : oauthError === "server_error"
             ? "Server error occurred. Please try again later."
-            : "OAuth authentication failed. Please try again.";
-          
-          // Redirect immediately to login/register with error message
-          router.replace(`/auth/${fromPage}?oauth_error=${encodeURIComponent(errorMsg)}`);
+            : "Google sign-in failed. Please try again.";
+          router.replace(`/auth/${via}?oauth_error=${encodeURIComponent(msg)}`);
           return;
         }
 
-        // Check if this is a Google signup redirect (new user needs to complete signup)
-        if (googleParam === "true" && googleDataParam) {
-          try {
-            const decodedData = decodeURIComponent(googleDataParam);
-            const googleData = JSON.parse(decodedData);
-            // Redirect to signup page with Google data
-            router.replace(`/auth/signup?google=true&data=${encodeURIComponent(googleDataParam)}`);
-            return;
-          } catch (parseError) {
-            console.error("Failed to parse Google data:", parseError);
-            router.replace(`/auth/${fromPage}?oauth_error=${encodeURIComponent("Failed to process Google signup data")}`);
-            return;
-          }
-        }
-
-        // Check if tokens are present (existing user login)
         if (!accessToken || !refreshToken) {
-          const errorMsg = "Authentication tokens not received. Please try logging in again.";
-          router.replace(`/auth/${fromPage}?oauth_error=${encodeURIComponent(errorMsg)}`);
+          router.replace(
+            `/auth/${via}?oauth_error=${encodeURIComponent(
+              "Authentication tokens not received. Please try again.",
+            )}`,
+          );
           return;
         }
 
-        // Store tokens
+        if (via === "register") {
+          setHeadline("Account already exists");
+          setSubline("Signing you in to your existing account...");
+        }
+
         setTokens(accessToken, refreshToken);
-
-        // Refresh user data
         await refreshUser();
-
         setStatus("success");
 
-        // Get user role to redirect appropriately
         const saved = localStorage.getItem("auth_user");
         const user = saved ? JSON.parse(saved) : null;
         const redirectPath = user?.role === "ADMIN" ? "/admin/users" : "/dashboard";
 
-        // Redirect after short delay
+        setTimeout(() => router.push(redirectPath), 1500);
+      } catch (err) {
+        console.error("OAuth callback error:", err);
+        const msg = err instanceof Error ? err.message : "An error occurred during authentication. Please try again.";
+        setErrorMessage(msg);
+        setStatus("error");
         setTimeout(() => {
-          router.push(redirectPath);
-        }, 1500);
-      } catch (error) {
-        console.error("OAuth callback error:", error);
-        const fromPage = searchParams.get("from") || "login";
-        const errorMsg = error instanceof Error 
-          ? error.message 
-          : "An error occurred during authentication. Please try again.";
-        router.replace(`/auth/${fromPage}?oauth_error=${encodeURIComponent(errorMsg)}`);
+          router.replace(`/auth/${via}?oauth_error=${encodeURIComponent(msg)}`);
+        }, 2000);
       }
     };
 
@@ -105,10 +92,10 @@ function OAuthCallbackContent() {
           <>
             <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
             <h1 className="text-2xl font-display font-bold text-foreground mb-2">
-              Completing Sign In...
+              {headline}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Please wait while we complete your authentication.
+              {subline}
             </p>
           </>
         )}
@@ -117,7 +104,7 @@ function OAuthCallbackContent() {
           <>
             <CheckCircle className="h-12 w-12 text-success mx-auto mb-4" />
             <h1 className="text-2xl font-display font-bold text-foreground mb-2">
-              Sign In Successful!
+              {headline === "Account already exists" ? "Welcome back!" : "Sign In Successful!"}
             </h1>
             <p className="text-sm text-muted-foreground">
               Redirecting you to your dashboard...

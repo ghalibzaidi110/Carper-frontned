@@ -11,14 +11,20 @@ import { DamageLog } from "./components/DamageLog";
 import { DetectionsList } from "./components/DetectionsList";
 import { EstimateDialog } from "./components/EstimateDialog";
 import { ReportDialog } from "./components/ReportDialog";
+import { SaveScanToast } from "./components/SaveScanToast";
 import { VehicleSelect } from "./components/VehicleSelect";
 import { VendorsDialog } from "./components/VendorsDialog";
 import { useCamera } from "./hooks/useCamera";
 import { useDamageDetector } from "./hooks/useDamageDetector";
 import { useDepthEstimator } from "./hooks/useDepthEstimator";
-import { type LogEntry, REPAIR_TYPES, useDamageLog } from "./hooks/useDamageLog";
+import {
+  type LogEntry,
+  REPAIR_TYPES,
+  useDamageLog,
+} from "./hooks/useDamageLog";
 import { useDepthOverlay } from "./hooks/useDepthOverlay";
 import { useDetectionLoop } from "./hooks/useDetectionLoop";
+import { useSaveScan } from "./hooks/useSaveScan";
 import { useSecureContext } from "./hooks/useSecureContext";
 import { useWebXRDepth } from "./hooks/useWebXRDepth";
 
@@ -58,13 +64,8 @@ export default function LiveDetectionPage() {
   const { detections, fps } = useDetectionLoop({
     sourceRef,
     canvasRef,
-<<<<<<< HEAD
-    active: xr.xrStatus === "active" || camera.status === "active",
-    threshold: DETECTION_THRESHOLD,
-=======
     active: xrActive || camera.status === "active",
-    threshold,
->>>>>>> 6d3d980 (ar_session_revamped)
+    threshold: DETECTION_THRESHOLD,
     modelReady: detector.status === "ready",
     // AR mode: throttle YOLO to ~5 FPS. The XR frame loop runs at device
     // refresh rate; running WASM inference every frame blocks it completely.
@@ -109,6 +110,13 @@ export default function LiveDetectionPage() {
       setEstimateAllLoading(false);
     }
   }, [log, vehicle]);
+
+  // Save-scan state lives at page level so closing the Report Dialog
+  // mid-save still tracks progress in the floating toast.
+  const saveScan = useSaveScan();
+  const handleSaveScan = useCallback(() => {
+    void saveScan.save(log.entries, vehicle);
+  }, [saveScan, log.entries, vehicle]);
 
   const handleStartCamera = useCallback(() => {
     if (!secureContext.ok) return; // banner already explains why
@@ -192,7 +200,10 @@ export default function LiveDetectionPage() {
           <div className="flex-1" />
           {/* Bottom tray — full detection + log flow, same as camera mode */}
           <div className="p-3 bg-black/50 backdrop-blur-sm pointer-events-auto space-y-2 max-h-[55vh] overflow-y-auto">
-            <DetectionsList detections={detections} onLog={handleAddDetection} />
+            <DetectionsList
+              detections={detections}
+              onLog={handleAddDetection}
+            />
             <DamageLog
               entries={log.entries}
               onDelete={log.remove}
@@ -212,17 +223,22 @@ export default function LiveDetectionPage() {
             Live Damage Detection
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Point your camera at a vehicle to detect damage in real time. Log items to
-            estimate repair cost and find replacement parts.
+            Point your camera at a vehicle to detect damage in real time. Log
+            items to estimate repair cost and find replacement parts.
           </p>
         </div>
 
         {!secureContext.ok && (
           <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 flex items-start gap-3">
-            <ShieldAlert size={20} className="text-amber-700 dark:text-amber-400 mt-0.5 shrink-0" />
+            <ShieldAlert
+              size={20}
+              className="text-amber-700 dark:text-amber-400 mt-0.5 shrink-0"
+            />
             <div className="text-sm">
               <p className="font-semibold text-foreground">HTTPS required</p>
-              <p className="text-muted-foreground mt-1">{secureContext.reason}</p>
+              <p className="text-muted-foreground mt-1">
+                {secureContext.reason}
+              </p>
             </div>
           </div>
         )}
@@ -254,7 +270,10 @@ export default function LiveDetectionPage() {
 
           <aside className="space-y-4">
             <VehicleSelect value={vehicle} onChange={setVehicle} />
-            <DetectionsList detections={detections} onLog={handleAddDetection} />
+            <DetectionsList
+              detections={detections}
+              onLog={handleAddDetection}
+            />
             <DamageLog
               entries={log.entries}
               onDelete={log.remove}
@@ -272,15 +291,20 @@ export default function LiveDetectionPage() {
         entry={openEstimate}
         onClose={() => setOpenEstimate(null)}
       />
-      <VendorsDialog
-        entry={openVendors}
-        onClose={() => setOpenVendors(null)}
-      />
+      <VendorsDialog entry={openVendors} onClose={() => setOpenVendors(null)} />
       <ReportDialog
         open={openReport}
         entries={log.entries}
         vehicle={vehicle}
         onClose={() => setOpenReport(false)}
+        saveState={saveScan.state}
+        onSaveScan={handleSaveScan}
+      />
+
+      <SaveScanToast
+        state={saveScan.state}
+        onDismiss={saveScan.reset}
+        onRetry={handleSaveScan}
       />
     </>
   );

@@ -78,22 +78,26 @@ export const authService = {
       const errorMessage = errorData?.message;
       const statusCode = error?.response?.status;
       
-      // Handle validation errors (array of objects with property, value, constraints)
+      // Handle validation errors. NestJS's default ValidationPipe returns
+      // `message` as an array of plain strings (one per failed constraint),
+      // but a custom exceptionFactory can return an array of objects with
+      // `{ property, constraints }`. Handle both shapes.
       if (Array.isArray(errorMessage) && errorMessage.length > 0) {
         const formattedErrors = errorMessage
           .map((err: any) => {
-            const field = err.property || "field";
-            const constraints = err.constraints || {};
+            if (typeof err === "string") {
+              return err;
+            }
+            const field = err?.property || "field";
+            const constraints = err?.constraints || {};
             const constraintMessages = Object.values(constraints) as string[];
-            
-            // Only include if there are actual constraint messages
             if (constraintMessages.length > 0) {
               return `${field}: ${constraintMessages.join(", ")}`;
             }
             return null;
           })
-          .filter((msg: string | null) => msg !== null) as string[];
-        
+          .filter((msg: string | null): msg is string => typeof msg === "string" && msg.length > 0);
+
         if (formattedErrors.length > 0) {
           throw new Error(formattedErrors.join("; "));
         }
@@ -161,22 +165,26 @@ export const authService = {
       const errorMessage = errorData?.message;
       const statusCode = error?.response?.status;
       
-      // Handle validation errors (array of objects with property, value, constraints)
+      // Handle validation errors. NestJS's default ValidationPipe returns
+      // `message` as an array of plain strings (one per failed constraint),
+      // but a custom exceptionFactory can return an array of objects with
+      // `{ property, constraints }`. Handle both shapes.
       if (Array.isArray(errorMessage) && errorMessage.length > 0) {
         const formattedErrors = errorMessage
           .map((err: any) => {
-            const field = err.property || "field";
-            const constraints = err.constraints || {};
+            if (typeof err === "string") {
+              return err;
+            }
+            const field = err?.property || "field";
+            const constraints = err?.constraints || {};
             const constraintMessages = Object.values(constraints) as string[];
-            
-            // Only include if there are actual constraint messages
             if (constraintMessages.length > 0) {
               return `${field}: ${constraintMessages.join(", ")}`;
             }
             return null;
           })
-          .filter((msg: string | null) => msg !== null) as string[];
-        
+          .filter((msg: string | null): msg is string => typeof msg === "string" && msg.length > 0);
+
         if (formattedErrors.length > 0) {
           throw new Error(formattedErrors.join("; "));
         }
@@ -231,22 +239,26 @@ export const authService = {
       const errorMessage = errorData?.message;
       const statusCode = error?.response?.status;
       
-      // Handle validation errors (array of objects with property, value, constraints)
+      // Handle validation errors. NestJS's default ValidationPipe returns
+      // `message` as an array of plain strings (one per failed constraint),
+      // but a custom exceptionFactory can return an array of objects with
+      // `{ property, constraints }`. Handle both shapes.
       if (Array.isArray(errorMessage) && errorMessage.length > 0) {
         const formattedErrors = errorMessage
           .map((err: any) => {
-            const field = err.property || "field";
-            const constraints = err.constraints || {};
+            if (typeof err === "string") {
+              return err;
+            }
+            const field = err?.property || "field";
+            const constraints = err?.constraints || {};
             const constraintMessages = Object.values(constraints) as string[];
-            
-            // Only include if there are actual constraint messages
             if (constraintMessages.length > 0) {
               return `${field}: ${constraintMessages.join(", ")}`;
             }
             return null;
           })
-          .filter((msg: string | null) => msg !== null) as string[];
-        
+          .filter((msg: string | null): msg is string => typeof msg === "string" && msg.length > 0);
+
         if (formattedErrors.length > 0) {
           throw new Error(formattedErrors.join("; "));
         }
