@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { User } from "@/types";
 import { authService, RegisterPayload, GoogleCompleteSignupPayload } from "@/services/auth.service";
-import { getAccessToken, clearTokens } from "@/lib/api-client";
+import { getAccessToken, getRefreshToken, clearTokens } from "@/lib/api-client";
 import { normalizeUser } from "@/lib/normalize";
 
 interface AuthContextType {
@@ -34,12 +34,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const persistUser = (u: User) => {
+  const persistUser = useCallback((u: User) => {
     setUser(u);
     if (typeof window !== "undefined") {
       localStorage.setItem("auth_user", JSON.stringify(u));
     }
-  };
+  }, []);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -50,25 +50,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(null);
       clearTokens();
     }
-  }, []);
+  }, [persistUser]);
 
   useEffect(() => {
-    const token = getAccessToken();
-    if (token) {
-      refreshUser().finally(() => setLoading(false));
-    } else {
-      // Try to restore from localStorage for SSR hydration
-      if (typeof window !== "undefined") {
-        const saved = localStorage.getItem("auth_user");
-        if (saved) {
-          try {
-            setUser(JSON.parse(saved));
-          } catch { /* ignore */ }
+    let cancelled = false;
+
+    const restoreSession = async () => {
+      const accessToken = getAccessToken();
+      const refreshToken = getRefreshToken();
+
+      if (!accessToken && !refreshToken) {
+        clearTokens();
+        if (!cancelled) {
+          setUser(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        if (!accessToken && refreshToken) {
+          await authService.refresh(refreshToken);
+        }
+        const raw = await authService.getMe();
+        const normalized = normalizeUser(raw);
+        if (!cancelled) {
+          persistUser(normalized);
+        }
+      } catch {
+        clearTokens();
+        if (!cancelled) {
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
         }
       }
-      setLoading(false);
-    }
-  }, [refreshUser]);
+    };
+
+    restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [persistUser]);
 
   const login = useCallback(async (email: string, password: string) => {
     try {
@@ -80,7 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Re-throw error with message so the component can display it
       throw error;
     }
-  }, []);
+  }, [persistUser]);
 
   const register = useCallback(async (payload: RegisterPayload) => {
     try {
@@ -92,7 +118,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Re-throw error with message so the component can display it
       throw error;
     }
-  }, []);
+  }, [persistUser]);
 
   const completeGoogleSignup = useCallback(async (payload: GoogleCompleteSignupPayload) => {
     try {
@@ -104,7 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Re-throw error with message so the component can display it
       throw error;
     }
-  }, []);
+  }, [persistUser]);
 
   const logout = useCallback(async () => {
     try {

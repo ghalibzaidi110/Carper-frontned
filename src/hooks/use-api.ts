@@ -367,11 +367,12 @@ export const useDamageScan = () =>
 export const useNotifications = (params: NotificationFilters = {}) =>
   useQuery({ queryKey: ["notifications", params], queryFn: () => notificationsService.getAll(params) });
 
-export const useUnreadCount = () =>
+export const useUnreadCount = (enabled = true) =>
   useQuery({
     queryKey: ["unread-count"],
     queryFn: notificationsService.getUnreadCount,
-    refetchInterval: 30000,
+    enabled,
+    refetchInterval: enabled ? 30000 : false,
   });
 
 export const useMarkAsRead = () => {
