@@ -39,6 +39,8 @@ export interface LogEntry {
 
 interface UseDamageLogArgs {
   videoRef: React.RefObject<HTMLVideoElement | null>;
+  /** XR canvas ref — used as the capture source when AR mode is active. */
+  xrCanvasRef?: React.RefObject<HTMLCanvasElement | null>;
   /** Optional depth estimator — called during cost estimation for dent depth classification. */
   estimateDepth?: (
     source: DepthSource,
@@ -70,16 +72,16 @@ interface UseDamageLogReturn {
 let _logId = 0;
 
 /**
- * Capture the bounding-box region of the video into a JPEG dataURL.
+ * Capture the bounding-box region of a video or canvas into a JPEG dataURL.
  * Mirrors `new-webxr/src/main.js:480-508` (PAD=12px around the bbox).
  */
 async function captureRegion(
-  videoEl: HTMLVideoElement,
+  source: HTMLVideoElement | HTMLCanvasElement,
   bbox: Bbox,
 ): Promise<string | null> {
   const PAD = 12;
-  const vw = videoEl.videoWidth;
-  const vh = videoEl.videoHeight;
+  const vw = source instanceof HTMLVideoElement ? source.videoWidth : source.width;
+  const vh = source instanceof HTMLVideoElement ? source.videoHeight : source.height;
   if (!vw || !vh) return null;
 
   const [x, y, w, h] = bbox;
@@ -94,7 +96,7 @@ async function captureRegion(
   canvas.height = ch;
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
-  ctx.drawImage(videoEl, cx, cy, cw, ch, 0, 0, cw, ch);
+  ctx.drawImage(source, cx, cy, cw, ch, 0, 0, cw, ch);
   // outline the original damage region inside the crop
   ctx.strokeStyle = "#ff4757";
   ctx.lineWidth = 3;
@@ -102,7 +104,7 @@ async function captureRegion(
   return canvas.toDataURL("image/jpeg", 0.85);
 }
 
-export function useDamageLog({ videoRef, estimateDepth, xrActive, measureDamageXR }: UseDamageLogArgs): UseDamageLogReturn {
+export function useDamageLog({ videoRef, xrCanvasRef, estimateDepth, xrActive, measureDamageXR }: UseDamageLogArgs): UseDamageLogReturn {
   const [entries, setEntries] = useState<LogEntry[]>([]);
   // Mirror entries into a ref for synchronous reads in async handlers.
   // setState updaters can be deferred / re-run under React 18 Strict Mode,
@@ -187,7 +189,11 @@ export function useDamageLog({ videoRef, estimateDepth, xrActive, measureDamageX
         // Async: capture cropped frame -> IndexedDB. We pass `entryId`
         // through so the Save-scan flow can later look up this capture
         // by entry without scanning the whole store.
-        captureRegion(video, det.bbox)
+        // In AR mode the video element is hidden; use the XR canvas instead.
+        const captureSource: HTMLVideoElement | HTMLCanvasElement | null =
+          xrActive && xrCanvasRef?.current ? xrCanvasRef.current : video;
+        captureRegion(captureSource, det.bbox)
+
           .then((dataUrl) => {
             if (!dataUrl) return;
             return saveCapture({

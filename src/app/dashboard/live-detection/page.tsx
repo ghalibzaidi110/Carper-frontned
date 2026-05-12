@@ -1,6 +1,6 @@
 "use client";
 
-import { ShieldAlert } from "lucide-react";
+import { ShieldAlert, View, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { DEFAULT_VEHICLE, type Vehicle } from "@/lib/live-detection/vehicle";
@@ -17,7 +17,11 @@ import { VendorsDialog } from "./components/VendorsDialog";
 import { useCamera } from "./hooks/useCamera";
 import { useDamageDetector } from "./hooks/useDamageDetector";
 import { useDepthEstimator } from "./hooks/useDepthEstimator";
-import { type LogEntry, REPAIR_TYPES, useDamageLog } from "./hooks/useDamageLog";
+import {
+  type LogEntry,
+  REPAIR_TYPES,
+  useDamageLog,
+} from "./hooks/useDamageLog";
 import { useDepthOverlay } from "./hooks/useDepthOverlay";
 import { useDetectionLoop } from "./hooks/useDetectionLoop";
 import { useSaveScan } from "./hooks/useSaveScan";
@@ -46,21 +50,30 @@ export default function LiveDetectionPage() {
   // Detection source: XR canvas when AR active, video otherwise
   const sourceRef = xr.xrStatus === "active" ? xrCanvasRef : camera.videoRef;
 
+  const xrActive = xr.xrStatus === "active";
+
+  // Depth overlay uses Depth-Anything (50 MB model). In AR mode the device
+  // already provides native depth via WebXR — running both simultaneously
+  // causes main-thread contention and visible frame drops.
   const depthOverlay = useDepthOverlay({
     sourceRef,
     depthCanvasRef,
-    cameraActive: xr.xrStatus === "active" || camera.status === "active",
+    cameraActive: !xrActive && camera.status === "active",
   });
 
   const { detections, fps } = useDetectionLoop({
     sourceRef,
     canvasRef,
-    active: xr.xrStatus === "active" || camera.status === "active",
+    active: xrActive || camera.status === "active",
     threshold: DETECTION_THRESHOLD,
     modelReady: detector.status === "ready",
+    // AR mode: throttle YOLO to ~5 FPS. The XR frame loop runs at device
+    // refresh rate; running WASM inference every frame blocks it completely.
+    minIntervalMs: xrActive ? 200 : 0,
   });
   const log = useDamageLog({
     videoRef: camera.videoRef,
+    xrCanvasRef,
     estimateDepth: depth.estimateDepth,
     xrActive: xr.xrStatus === "active",
     measureDamageXR: xr.measureDamageXR,
@@ -162,23 +175,70 @@ export default function LiveDetectionPage() {
 
   return (
     <>
+      {/* ── Fullscreen AR controls overlay ───────────────────────────────────
+          The XR canvas and bbox canvas go fixed/fullscreen via CSS inside
+          CameraViewport (z-40, z-41). This overlay (z-50) floats controls
+          on top so the user can tap detections and exit AR.              */}
+      {xrActive && (
+        <div className="fixed inset-0 z-50 flex flex-col pointer-events-none">
+          {/* Top bar */}
+          <div className="flex items-center justify-between p-3 bg-black/50 backdrop-blur-sm pointer-events-auto">
+            <span className="flex items-center gap-2 text-white text-sm font-semibold">
+              <View size={16} className="text-emerald-400" />
+              AR Depth Mode
+            </span>
+            <button
+              type="button"
+              onClick={handleStopAR}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-destructive text-destructive-foreground text-sm font-semibold hover:bg-destructive/90 transition-colors"
+            >
+              <X size={14} />
+              Exit AR
+            </button>
+          </div>
+          {/* Centre clear — lets the user see the AR camera view */}
+          <div className="flex-1" />
+          {/* Bottom tray — full detection + log flow, same as camera mode */}
+          <div className="p-3 bg-black/50 backdrop-blur-sm pointer-events-auto space-y-2 max-h-[55vh] overflow-y-auto">
+            <DetectionsList
+              detections={detections}
+              onLog={handleAddDetection}
+            />
+            <DamageLog
+              entries={log.entries}
+              onDelete={log.remove}
+              onClear={log.clear}
+              onEstimate={handleEstimate}
+              onEstimateAll={handleEstimateAll}
+              onSetPanel={log.setPanelLocation}
+              estimateAllLoading={estimateAllLoading}
+            />
+          </div>
+        </div>
+      )}
+
       <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground">
             Live Damage Detection
           </h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Point your camera at a vehicle to detect damage in real time. Log items to
-            estimate repair cost and find replacement parts.
+            Point your camera at a vehicle to detect damage in real time. Log
+            items to estimate repair cost and find replacement parts.
           </p>
         </div>
 
         {!secureContext.ok && (
           <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 flex items-start gap-3">
-            <ShieldAlert size={20} className="text-amber-700 dark:text-amber-400 mt-0.5 shrink-0" />
+            <ShieldAlert
+              size={20}
+              className="text-amber-700 dark:text-amber-400 mt-0.5 shrink-0"
+            />
             <div className="text-sm">
               <p className="font-semibold text-foreground">HTTPS required</p>
-              <p className="text-muted-foreground mt-1">{secureContext.reason}</p>
+              <p className="text-muted-foreground mt-1">
+                {secureContext.reason}
+              </p>
             </div>
           </div>
         )}
@@ -210,7 +270,10 @@ export default function LiveDetectionPage() {
 
           <aside className="space-y-4">
             <VehicleSelect value={vehicle} onChange={setVehicle} />
-            <DetectionsList detections={detections} onLog={handleAddDetection} />
+            <DetectionsList
+              detections={detections}
+              onLog={handleAddDetection}
+            />
             <DamageLog
               entries={log.entries}
               onDelete={log.remove}
@@ -228,10 +291,7 @@ export default function LiveDetectionPage() {
         entry={openEstimate}
         onClose={() => setOpenEstimate(null)}
       />
-      <VendorsDialog
-        entry={openVendors}
-        onClose={() => setOpenVendors(null)}
-      />
+      <VendorsDialog entry={openVendors} onClose={() => setOpenVendors(null)} />
       <ReportDialog
         open={openReport}
         entries={log.entries}

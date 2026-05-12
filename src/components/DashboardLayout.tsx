@@ -43,7 +43,7 @@ const DashboardLayout: React.FC<{ children: React.ReactNode }> = ({ children }) 
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement | null>(null);
-  const { data: unreadData } = useUnreadCount();
+  const { data: unreadData } = useUnreadCount(!loading && !!user);
   const unreadCount = unreadData?.unreadCount ?? 0;
 
   useEffect(() => {
