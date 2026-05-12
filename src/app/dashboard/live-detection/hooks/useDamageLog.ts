@@ -193,6 +193,7 @@ export function useDamageLog({ videoRef, xrCanvasRef, estimateDepth, xrActive, m
         const captureSource: HTMLVideoElement | HTMLCanvasElement | null =
           xrActive && xrCanvasRef?.current ? xrCanvasRef.current : video;
         captureRegion(captureSource, det.bbox)
+
           .then((dataUrl) => {
             if (!dataUrl) return;
             return saveCapture({
